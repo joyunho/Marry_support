@@ -13,13 +13,25 @@
 
 ### 방법 1 — Windows 실행 파일(exe)
 
-GitHub 웹에서: **[dist 폴더](https://github.com/joyunho/Marry_support/tree/claude/improve-condolence-program-crkvnb/dist)** → `마음장부_카운터_v3.0.0.exe` 클릭 → 우측 상단 **다운로드(Download raw file)** 버튼.
+**한 줄 설치** — 명령 프롬프트(cmd)에 붙여넣으면 `%LOCALAPPDATA%\Programs\MaeumLedger`에 설치되고, 바탕화면에 "마음장부 카운터" 바로가기가 생기며, 바로 실행됩니다:
 
-저장소가 공개라면 명령 프롬프트(cmd)에서 한 줄로:
+```cmd
+powershell -NoProfile -Command "$d=Join-Path $env:LOCALAPPDATA 'Programs\MaeumLedger'; $null=New-Item -ItemType Directory -Force -Path $d; $exe=Join-Path $d 'MaeumLedgerCounter.exe'; iwr -useb 'https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/dist/%EB%A7%88%EC%9D%8C%EC%9E%A5%EB%B6%80_%EC%B9%B4%EC%9A%B4%ED%84%B0_v3.0.0.exe' -OutFile $exe; $ws=New-Object -ComObject WScript.Shell; $lnk=$ws.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) '마음장부 카운터.lnk')); $lnk.TargetPath=$exe; $lnk.Save(); Start-Process $exe"
+```
+
+삭제(제거)도 한 줄입니다:
+
+```cmd
+powershell -NoProfile -Command "Remove-Item -Recurse -Force (Join-Path $env:LOCALAPPDATA 'Programs\MaeumLedger') -ErrorAction SilentlyContinue; Remove-Item (Join-Path ([Environment]::GetFolderPath('Desktop')) '마음장부 카운터.lnk') -ErrorAction SilentlyContinue"
+```
+
+단순 다운로드만 원하면:
 
 ```cmd
 curl -L -o "%USERPROFILE%\Desktop\마음장부_카운터.exe" https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/dist/%EB%A7%88%EC%9D%8C%EC%9E%A5%EB%B6%80_%EC%B9%B4%EC%9A%B4%ED%84%B0_v3.0.0.exe
 ```
+
+GitHub 웹으로 받으려면: **[dist 폴더](https://github.com/joyunho/Marry_support/tree/claude/improve-condolence-program-crkvnb/dist)** → `마음장부_카운터_v3.0.0.exe` 클릭 → 우측 상단 **다운로드(Download raw file)** 버튼.
 
 - 더블클릭하면 프로그램 창이 바로 열립니다. Windows 10/11이면 별도 설치가 필요 없습니다
   (Edge에 포함된 WebView2 사용, 없는 PC에서는 기본 브라우저로 대신 열어줍니다).
