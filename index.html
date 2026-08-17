@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>마음장부 카운터 3.0</title>
+<style>
+:root{
+  --bg:#f4f6f9; --card:#ffffff; --ink:#1c2733; --sub:#5b6b7b; --line:#dde4ec;
+  --accent:#2563eb; --accent-ink:#ffffff; --accent-soft:#e8effd;
+  --ok:#15803d; --ok-soft:#e6f4ea; --warn:#b45309; --warn-soft:#fdf3e2;
+  --bad:#b91c1c; --bad-soft:#fdecec; --mute:#8896a6;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12181f; --card:#1b232d; --ink:#e8eef5; --sub:#9fb0c0; --line:#2c3947;
+    --accent:#5b8def; --accent-ink:#0d1117; --accent-soft:#1f2c44;
+    --ok:#4ade80; --ok-soft:#15301f; --warn:#fbbf24; --warn-soft:#3a2c10;
+    --bad:#f87171; --bad-soft:#3a1717; --mute:#66788c;
+  }
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html{font-size:16px;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",system-ui,sans-serif;
+  line-height:1.5; min-height:100vh;
+}
+button{font:inherit; cursor:pointer;}
+input,textarea,select{font:inherit; color:inherit;}
+header.app{
+  background:var(--card); border-bottom:1px solid var(--line);
+  padding:.7rem 1rem; display:flex; flex-wrap:wrap; gap:.4rem 1rem; align-items:baseline;
+}
+header.app h1{font-size:1.15rem;}
+header.app .event-name{color:var(--sub); font-size:.95rem;}
+header.app .summary{margin-left:auto; font-size:.95rem; color:var(--sub); display:flex; flex-wrap:wrap; gap:.2rem .9rem;}
+header.app .summary b{color:var(--ink);}
+header.app .summary .bad-n{color:var(--bad); font-weight:700;}
+nav.tabs{
+  display:flex; gap:.4rem; padding:.6rem 1rem 0; max-width:1080px; margin:0 auto; width:100%;
+  flex-wrap:wrap;
+}
+nav.tabs button{
+  border:1px solid var(--line); border-bottom:none; background:var(--card); color:var(--sub);
+  padding:.55rem 1.1rem; border-radius:.6rem .6rem 0 0; font-size:1rem; font-weight:600;
+}
+nav.tabs button[aria-selected="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+nav.tabs button .badge{
+  display:inline-block; min-width:1.4em; padding:0 .3em; margin-left:.35em; border-radius:1em;
+  background:var(--bad); color:#fff; font-size:.8em; text-align:center;
+}
+main{max-width:1080px; margin:0 auto; padding:0 1rem 3rem; width:100%;}
+section.tab{display:none;}
+section.tab.active{display:block;}
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:.8rem;
+  padding:1rem 1.1rem; margin-top:1rem;
+}
+.card h2{font-size:1.05rem; margin-bottom:.2rem;}
+.card .hint{color:var(--sub); font-size:.9rem;}
+.grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:.7rem; margin-top:.7rem;}
+@media (max-width:720px){ .grid-3{grid-template-columns:1fr;} }
+.field label{display:block; font-size:.85rem; color:var(--sub); margin-bottom:.15rem;}
+.field input[type=text], .field textarea, .field select{
+  width:100%; padding:.5rem .6rem; border:1px solid var(--line); border-radius:.5rem;
+  background:var(--bg);
+}
+.field input:focus, .field textarea:focus, .denom input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+table.denoms{width:100%; border-collapse:collapse; margin-top:.6rem;}
+table.denoms td{padding:.3rem .25rem; vertical-align:middle;}
+table.denoms td.dl{font-weight:600; white-space:nowrap; width:9.5rem;}
+table.denoms td.dl .hot{color:var(--mute); font-weight:400; font-size:.8rem; margin-left:.25rem;}
+table.denoms td.dsub{text-align:right; color:var(--sub); white-space:nowrap; width:9rem; font-variant-numeric:tabular-nums;}
+.denom{display:flex; align-items:center; gap:.35rem;}
+.denom button{
+  width:2.6rem; height:2.6rem; font-size:1.3rem; font-weight:700; border-radius:.5rem;
+  border:1px solid var(--line); background:var(--bg); color:var(--ink);
+}
+.denom button:active{background:var(--accent-soft);}
+.denom input{
+  width:5.2rem; height:2.6rem; text-align:center; font-size:1.25rem; font-weight:700;
+  border:1px solid var(--line); border-radius:.5rem; background:var(--bg);
+  font-variant-numeric:tabular-nums;
+}
+.denom input::-webkit-outer-spin-button, .denom input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.denom input[type=number]{-moz-appearance:textfield; appearance:textfield;}
+.etc-row{display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;}
+.etc-row input{
+  width:11rem; height:2.6rem; padding:0 .6rem; text-align:right; font-size:1.15rem; font-weight:700;
+  border:1px solid var(--line); border-radius:.5rem; background:var(--bg); font-variant-numeric:tabular-nums;
+}
+.total-line{
+  display:flex; align-items:baseline; gap:.8rem; margin-top:.8rem; padding-top:.7rem;
+  border-top:1px dashed var(--line); flex-wrap:wrap;
+}
+.total-line .tl{color:var(--sub);}
+.total-line .tv{font-size:2rem; font-weight:800; font-variant-numeric:tabular-nums;}
+.extra-row{display:flex; gap:1rem; margin-top:.8rem; flex-wrap:wrap; align-items:flex-end;}
+.extra-row .field{min-width:8rem;}
+.extra-row input[type=number]{
+  width:6rem; padding:.45rem .5rem; text-align:center; border:1px solid var(--line);
+  border-radius:.5rem; background:var(--bg); font-weight:700;
+}
+.check-field{display:flex; align-items:center; gap:.4rem; padding:.5rem 0; font-weight:600;}
+.check-field input{width:1.2rem; height:1.2rem;}
+.memo-field{flex:1 1 16rem;}
+.btn-row{display:flex; gap:.6rem; margin-top:1rem; flex-wrap:wrap;}
+.btn{
+  padding:.7rem 1.3rem; border-radius:.6rem; border:1px solid var(--line);
+  background:var(--card); color:var(--ink); font-weight:700; font-size:1.02rem;
+}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+.btn.primary:disabled{opacity:.45; cursor:not-allowed;}
+.btn.danger{color:var(--bad); border-color:var(--bad);}
+.btn.small{padding:.3rem .7rem; font-size:.88rem; font-weight:600;}
+.notice{
+  margin-top:.8rem; padding:.6rem .8rem; border-radius:.5rem; font-size:.95rem; display:none;
+}
+.notice.show{display:block;}
+.notice.ok{background:var(--ok-soft); color:var(--ok);}
+.notice.warn{background:var(--warn-soft); color:var(--warn);}
+.notice.bad{background:var(--bad-soft); color:var(--bad);}
+.edit-banner{
+  display:none; margin-top:.8rem; padding:.55rem .8rem; border-radius:.5rem;
+  background:var(--warn-soft); color:var(--warn); font-weight:600;
+}
+.edit-banner.show{display:flex; gap:.8rem; align-items:center; flex-wrap:wrap;}
+table.list{width:100%; border-collapse:collapse; margin-top:.6rem; font-size:.95rem;}
+table.list th{
+  text-align:left; color:var(--sub); font-size:.82rem; font-weight:600;
+  border-bottom:1px solid var(--line); padding:.35rem .4rem; white-space:nowrap;
+}
+table.list td{border-bottom:1px solid var(--line); padding:.42rem .4rem; vertical-align:middle;}
+table.list td.num, table.list th.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+table.list tr.canceled td{color:var(--mute); text-decoration:line-through;}
+table.list tr.canceled td.actions{text-decoration:none;}
+.chip{display:inline-block; padding:.05rem .5rem; border-radius:1rem; font-size:.8rem; font-weight:700; white-space:nowrap;}
+.chip.ok{background:var(--ok-soft); color:var(--ok);}
+.chip.pending{background:var(--bg); color:var(--sub); border:1px solid var(--line);}
+.chip.bad{background:var(--bad-soft); color:var(--bad);}
+.chip.cancel{background:var(--bg); color:var(--mute); border:1px solid var(--line);}
+.vq-head{display:flex; align-items:baseline; gap:.8rem; flex-wrap:wrap;}
+.vq-head .vq-count{font-weight:700;}
+.vq-current{
+  margin-top:.7rem; padding:.7rem .9rem; border:1px solid var(--line); border-radius:.6rem;
+  background:var(--bg); font-size:1.05rem;
+}
+.vq-current b{font-size:1.15rem;}
+.vresult{margin-top:.8rem; display:none; padding:.7rem .9rem; border-radius:.6rem; font-size:.98rem;}
+.vresult.show{display:block;}
+.vresult.ok{background:var(--ok-soft); color:var(--ok); font-weight:700;}
+.vresult.bad{background:var(--bad-soft); color:var(--bad);}
+.vresult .cmp{margin-top:.4rem; font-weight:400; font-variant-numeric:tabular-nums;}
+.close-grid{display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:.8rem;}
+@media (max-width:820px){ .close-grid{grid-template-columns:1fr;} }
+table.recon{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;}
+table.recon th{color:var(--sub); font-size:.82rem; font-weight:600; text-align:right; padding:.3rem .4rem; border-bottom:1px solid var(--line);}
+table.recon th:first-child{text-align:left;}
+table.recon td{padding:.35rem .4rem; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap;}
+table.recon td:first-child{text-align:left; font-weight:600;}
+table.recon td.diff-bad{color:var(--bad); font-weight:700;}
+table.recon td.diff-ok{color:var(--ok); font-weight:700;}
+table.recon tr.total td{font-weight:800; font-size:1.05rem;}
+.stat-tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(10rem,1fr)); gap:.7rem; margin-top:.7rem;}
+.stat-tile{border:1px solid var(--line); border-radius:.6rem; padding:.6rem .8rem; background:var(--bg);}
+.stat-tile .k{font-size:.82rem; color:var(--sub);}
+.stat-tile .v{font-size:1.35rem; font-weight:800; font-variant-numeric:tabular-nums;}
+.search-row{display:flex; gap:.6rem; margin-top:.6rem; flex-wrap:wrap;}
+.search-row input{
+  flex:1 1 14rem; padding:.5rem .7rem; border:1px solid var(--line); border-radius:.5rem; background:var(--bg);
+}
+.ticket-adjust-row{display:flex; gap:.5rem; margin-top:.5rem; flex-wrap:wrap; align-items:center;}
+.ticket-adjust-row input[type=text]{flex:1 1 12rem; padding:.45rem .6rem; border:1px solid var(--line); border-radius:.5rem; background:var(--bg);}
+.ticket-adjust-row input[type=number]{width:6rem; padding:.45rem .5rem; text-align:center; border:1px solid var(--line); border-radius:.5rem; background:var(--bg); font-weight:700;}
+ul.adjust-list{list-style:none; margin-top:.5rem;}
+ul.adjust-list li{display:flex; gap:.6rem; align-items:center; padding:.3rem 0; border-bottom:1px dashed var(--line);}
+ul.adjust-list li .d{flex:1;}
+ul.adjust-list li .n{font-weight:700; font-variant-numeric:tabular-nums;}
+.kbd-help{color:var(--mute); font-size:.85rem; margin-top:.8rem;}
+kbd{
+  border:1px solid var(--line); border-bottom-width:2px; border-radius:.3rem;
+  padding:0 .35rem; font-size:.85em; background:var(--bg);
+}
+#print-area{display:none;}
+@media print{
+  body *{visibility:hidden;}
+  #print-area, #print-area *{visibility:visible;}
+  #print-area{
+    display:block; position:absolute; left:0; top:0; width:100%;
+    color:#000; background:#fff; font-size:12px; padding:8mm;
+  }
+  #print-area h1{font-size:16px; margin-bottom:2mm;}
+  #print-area table{width:100%; border-collapse:collapse; margin-top:3mm;}
+  #print-area th, #print-area td{border:1px solid #999; padding:1.2mm 2mm; text-align:left;}
+  #print-area td.num{text-align:right;}
+}
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>마음장부 카운터 <small>3.0</small></h1>
+  <span class="event-name" id="hdr-event"></span>
+  <div class="summary" id="hdr-summary" aria-live="polite"></div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="entry" aria-selected="true">1&nbsp;접수 (1차 카운팅)</button>
+  <button role="tab" data-tab="verify" aria-selected="false">2&nbsp;2차 검수<span class="badge" id="verify-badge" hidden></span></button>
+  <button role="tab" data-tab="close" aria-selected="false">3&nbsp;마감·정산</button>
+  <button role="tab" data-tab="stats" aria-selected="false">4&nbsp;전체 기록·설정</button>
+</nav>
+
+<main>
+<!-- ══════════════ 1. 접수 ══════════════ -->
+<section class="tab active" id="tab-entry" role="tabpanel">
+  <div class="card">
+    <h2 id="entry-title">새 봉투 입력</h2>
+    <p class="hint">봉투를 열고 지폐 장수만 입력하세요. 이름을 몰라도 저장할 수 있습니다 — 프로그램 번호로 구분됩니다. 봉투에는 같은 번호를 적어 두세요.</p>
+    <div class="edit-banner" id="edit-banner">
+      <span id="edit-banner-text"></span>
+      <button class="btn small" id="btn-edit-cancel" type="button">수정 취소</button>
+    </div>
+    <div class="grid-3">
+      <div class="field"><label for="in-label">봉투 표시 (선택)</label><input type="text" id="in-label" placeholder="예: 흰 봉투, 한자 이름"></div>
+      <div class="field"><label for="in-name">이름 (선택)</label><input type="text" id="in-name" placeholder="예: 김철수"></div>
+      <div class="field"><label for="in-org">소속 (선택)</label><input type="text" id="in-org" placeholder="예: 회사 동료"></div>
+    </div>
+    <table class="denoms" id="entry-denoms"></table>
+    <div class="etc-row" style="margin-top:.5rem">
+      <span style="font-weight:600">동전·수표·기타</span>
+      <input type="text" id="in-etc" inputmode="numeric" placeholder="0" aria-label="동전·수표·기타 금액(원)">
+      <span class="hint">원 (수표·동전은 금액으로 입력)</span>
+    </div>
+    <div class="extra-row">
+      <div class="field"><label for="in-tickets">식권 지급 (장)</label><input type="number" id="in-tickets" min="0" max="999" value="0"></div>
+      <label class="check-field"><input type="checkbox" id="in-gift">답례품·답례봉투 지급</label>
+      <div class="field memo-field"><label for="in-memo">메모 (선택)</label><input type="text" id="in-memo" placeholder="예: 식사 안 하심, 한자 성함 확인함"></div>
+    </div>
+    <div class="total-line">
+      <span class="tl">자동 합계</span>
+      <span class="tv" id="entry-total">0 원</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="btn-save" type="button">저장하고 다음 (Enter)</button>
+      <button class="btn" id="btn-clear" type="button">입력 지우기 (Esc)</button>
+    </div>
+    <div class="notice" id="entry-notice" aria-live="polite"></div>
+    <p class="kbd-help"><kbd>F1</kbd> 5만원 · <kbd>F2</kbd> 1만원 · <kbd>F3</kbd> 5천원 · <kbd>F4</kbd> 1천원 한 장씩 추가 · <kbd>Enter</kbd> 저장 · <kbd>Esc</kbd> 지우기</p>
+  </div>
+
+  <div class="card">
+    <h2>최근 기록</h2>
+    <p class="hint">잘못 입력했다면 [수정]을 누르세요. 수정하면 해당 봉투는 2차 검수를 다시 합니다. 전체 기록은 4번 탭에 있습니다.</p>
+    <table class="list" id="recent-table">
+      <thead><tr>
+        <th class="num">번호</th><th>봉투 표시</th><th>이름 · 소속</th><th class="num">금액</th>
+        <th class="num">식권</th><th>상태</th><th></th>
+      </tr></thead>
+      <tbody id="recent-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════ 2. 2차 검수 ══════════════ -->
+<section class="tab" id="tab-verify" role="tabpanel">
+  <div class="card">
+    <h2>2차 검수 — 첫 금액을 보지 말고 같은 돈을 다시 세세요</h2>
+    <p class="hint" id="verify-head">확인 필요한 봉투가 없습니다.</p>
+    <div class="vq-current" id="vq-current" hidden></div>
+    <table class="denoms" id="verify-denoms"></table>
+    <div class="etc-row" style="margin-top:.5rem">
+      <span style="font-weight:600">동전·수표·기타</span>
+      <input type="text" id="vf-etc" inputmode="numeric" placeholder="0" aria-label="검수 동전·수표·기타 금액(원)">
+      <span class="hint">원</span>
+    </div>
+    <div class="total-line">
+      <span class="tl">지금 센 금액</span>
+      <span class="tv" id="verify-total">0 원</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="btn-verify" type="button">2차 결과 저장 · 대조 (Enter)</button>
+      <button class="btn" id="btn-verify-reset" type="button">다시 세기 (Esc)</button>
+      <button class="btn" id="btn-verify-skip" type="button">이 봉투 건너뛰기</button>
+    </div>
+    <div class="vresult" id="vresult" aria-live="polite"></div>
+    <p class="kbd-help">일치: 자동으로 다음 봉투로 이동 · 불일치: 해당 봉투만 남겨 다시 확인 · 1차 기록이 잘못됐다면 접수 탭에서 해당 번호를 수정하세요.</p>
+  </div>
+</section>
+
+<!-- ══════════════ 3. 마감·정산 ══════════════ -->
+<section class="tab" id="tab-close" role="tabpanel">
+  <div class="card">
+    <h2>마감 — 마지막으로 전체 현금을 권종별로 세어 주세요</h2>
+    <p class="hint">미검수·불일치가 0개이고 차액이 0원일 때만 마감됩니다. 입력하는 즉시 자동 저장됩니다.</p>
+    <div class="close-grid">
+      <div>
+        <h3 style="font-size:.95rem; margin-bottom:.3rem">실제 현금 장수</h3>
+        <table class="denoms" id="close-denoms"></table>
+        <div class="etc-row" style="margin-top:.5rem">
+          <span style="font-weight:600">동전·수표·기타</span>
+          <input type="text" id="cl-etc" inputmode="numeric" placeholder="0" aria-label="실제 동전·수표·기타 금액(원)">
+          <span class="hint">원</span>
+        </div>
+      </div>
+      <div>
+        <h3 style="font-size:.95rem; margin-bottom:.3rem">장부와 대조</h3>
+        <table class="recon" id="recon-table"></table>
+      </div>
+    </div>
+    <div class="notice" id="close-notice" aria-live="polite"></div>
+    <div class="btn-row">
+      <button class="btn primary" id="btn-close" type="button">정산 마감 확인</button>
+      <button class="btn" id="btn-csv" type="button">CSV 정산표 저장</button>
+      <button class="btn" id="btn-print" type="button">정산표 인쇄</button>
+      <button class="btn danger" id="btn-new-event" type="button">새 행사 시작</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ 4. 전체 기록·설정 ══════════════ -->
+<section class="tab" id="tab-stats" role="tabpanel">
+  <div class="card">
+    <h2>현황</h2>
+    <div class="stat-tiles" id="stat-tiles"></div>
+    <p class="hint" id="stat-denoms" style="margin-top:.6rem"></p>
+  </div>
+
+  <div class="card">
+    <h2>식권 관리</h2>
+    <p class="hint">받은 식권 수량을 적어 두면 잔여 수량이 자동 계산됩니다. 반대측과 식권을 빌려주고 받을 때는 반드시 기록하세요.</p>
+    <div class="extra-row">
+      <div class="field"><label for="tk-start">준비된 식권 (장)</label><input type="number" id="tk-start" min="0" max="99999" value="0"></div>
+    </div>
+    <div class="ticket-adjust-row">
+      <input type="text" id="tk-adj-desc" placeholder="예: 신랑측에 빌려줌">
+      <input type="number" id="tk-adj-n" placeholder="장수" step="1">
+      <button class="btn small" id="btn-tk-adj" type="button">조정 기록 추가</button>
+      <span class="hint">빌려줌·분실은 음수(-20), 받아옴·추가 수령은 양수(20)로 입력</span>
+    </div>
+    <ul class="adjust-list" id="tk-adj-list"></ul>
+    <p style="margin-top:.6rem; font-weight:700" id="tk-summary"></p>
+  </div>
+
+  <div class="card">
+    <h2>전체 기록 <span class="hint" id="all-count"></span></h2>
+    <div class="search-row">
+      <input type="text" id="search" placeholder="이름 · 소속 · 봉투 표시 · 메모 · 번호로 검색">
+    </div>
+    <table class="list">
+      <thead><tr>
+        <th class="num">번호</th><th>봉투 표시</th><th>이름</th><th>소속</th><th class="num">금액</th>
+        <th class="num">식권</th><th>답례품</th><th>메모</th><th>상태</th><th></th>
+      </tr></thead>
+      <tbody id="all-body"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>행사 설정 · 데이터 관리</h2>
+    <div class="grid-3">
+      <div class="field"><label for="ev-name">행사명 (정산표에 표시)</label><input type="text" id="ev-name" placeholder="예: 홍길동·김영희 결혼식 — 신부측 접수"></div>
+    </div>
+    <p class="hint" style="margin-top:.6rem">
+      기록은 이 브라우저 안(localStorage)에 자동 저장되며, 페이지를 닫았다 열어도 유지됩니다.
+      다만 브라우저 데이터 삭제에 대비해 행사 후 <b>JSON 백업</b>과 <b>CSV 정산표</b>를 꼭 내려받아 두세요.
+    </p>
+    <div class="btn-row">
+      <button class="btn" id="btn-backup" type="button">JSON 백업 내려받기</button>
+      <button class="btn" id="btn-restore" type="button">JSON 백업 불러오기</button>
+      <input type="file" id="restore-file" accept=".json,application/json" hidden>
+    </div>
+    <div class="notice" id="stats-notice" aria-live="polite"></div>
+  </div>
+</section>
+</main>
+
+<div id="print-area"></div>
+
+<script>
+'use strict';
+/* ─────────────────────────── 상수 · 유틸 ─────────────────────────── */
+const DENOMS = [
+  { key:'c50', label:'50,000원권', value:50000, hot:'F1' },
+  { key:'c10', label:'10,000원권', value:10000, hot:'F2' },
+  { key:'c5',  label:'5,000원권',  value:5000,  hot:'F3' },
+  { key:'c1',  label:'1,000원권',  value:1000,  hot:'F4' },
+];
+const MAX_BILLS = 20000;          // 권종별 장수 상한 (v2와 동일)
+const MAX_ETC   = 1000000000;     // 기타 금액 상한 10억
+const MAX_ENTRIES = 5000;         // 기록 한도
+const LS_MAIN = 'maeumLedger.v3';
+const LS_BAK  = 'maeumLedger.v3.bak';
+const LS_ARCHIVE_PREFIX = 'maeumLedger.v3.archive.';
+const MAX_ARCHIVES = 5;
+
+const $ = (id) => document.getElementById(id);
+const won = (n) => Number(n || 0).toLocaleString('ko-KR');
+const nowStamp = () => {
+  const d = new Date(), p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+};
+const fileStamp = () => nowStamp().replace(/[-: ]/g, '').slice(0, 8) + '-' + nowStamp().slice(11).replace(/:/g, '');
+function clampInt(v, min, max){
+  const n = Math.trunc(Number(String(v ?? '').replace(/[,\s원]/g, '')));
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+function amountOf(counts){
+  let a = clampInt(counts.etc, 0, MAX_ETC);
+  for (const d of DENOMS) a += clampInt(counts[d.key], 0, MAX_BILLS) * d.value;
+  return a;
+}
+function countsEqual(a, b){
+  return DENOMS.every(d => clampInt(a[d.key],0,MAX_BILLS) === clampInt(b[d.key],0,MAX_BILLS))
+      && clampInt(a.etc,0,MAX_ETC) === clampInt(b.etc,0,MAX_ETC);
+}
+function denomBreakdown(c){
+  return DENOMS.map(d => `${d.label.replace(',000원권','천원').replace('50천원','5만원').replace('10천원','1만원')} ${clampInt(c[d.key],0,MAX_BILLS)}장`).join(' · ');
+}
+function shortBreakdown(c){
+  return `5만원 ${clampInt(c.c50,0,MAX_BILLS)}장 · 1만원 ${clampInt(c.c10,0,MAX_BILLS)}장 · 5천원 ${clampInt(c.c5,0,MAX_BILLS)}장 · 1천원 ${clampInt(c.c1,0,MAX_BILLS)}장`
+    + (clampInt(c.etc,0,MAX_ETC) ? ` · 기타 ${won(clampInt(c.etc,0,MAX_ETC))}원` : '');
+}
+function esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ─────────────────────────── 상태 ─────────────────────────── */
+function freshState(){
+  return {
+    version: 3,
+    createdAt: nowStamp(),
+    event: { name: '', ticketStart: 0, ticketAdjusts: [] }, // ticketAdjusts: {desc, n, at}
+    seq: 1,
+    entries: [],   // {id,no,label,name,org,c50,c10,c5,c1,etc,tickets,gift,memo,status,verify,canceled,created,updated}
+    closing: { c50:0, c10:0, c5:0, c1:0, etc:0, closedAt: null },
+  };
+}
+function normalizeState(s){
+  if (!s || typeof s !== 'object' || !Array.isArray(s.entries)) return null;
+  const out = freshState();
+  out.createdAt = typeof s.createdAt === 'string' ? s.createdAt : out.createdAt;
+  if (s.event && typeof s.event === 'object'){
+    out.event.name = String(s.event.name ?? '');
+    out.event.ticketStart = clampInt(s.event.ticketStart, 0, 99999);
+    if (Array.isArray(s.event.ticketAdjusts)){
+      out.event.ticketAdjusts = s.event.ticketAdjusts
+        .filter(a => a && typeof a === 'object')
+        .map(a => ({ desc: String(a.desc ?? ''), n: clampInt(a.n, -99999, 99999), at: String(a.at ?? '') }));
+    }
+  }
+  out.entries = s.entries.filter(e => e && typeof e === 'object').map((e, i) => ({
+    id: String(e.id ?? ('e' + i)),
+    no: clampInt(e.no, 1, 10 ** 9),
+    label: String(e.label ?? ''), name: String(e.name ?? ''), org: String(e.org ?? ''),
+    c50: clampInt(e.c50, 0, MAX_BILLS), c10: clampInt(e.c10, 0, MAX_BILLS),
+    c5: clampInt(e.c5, 0, MAX_BILLS), c1: clampInt(e.c1, 0, MAX_BILLS),
+    etc: clampInt(e.etc, 0, MAX_ETC),
+    tickets: clampInt(e.tickets, 0, 999),
+    gift: !!e.gift,
+    memo: String(e.memo ?? ''),
+    status: ['pending', 'verified', 'mismatch'].includes(e.status) ? e.status : 'pending',
+    verify: (e.verify && typeof e.verify === 'object') ? {
+      c50: clampInt(e.verify.c50, 0, MAX_BILLS), c10: clampInt(e.verify.c10, 0, MAX_BILLS),
+      c5: clampInt(e.verify.c5, 0, MAX_BILLS), c1: clampInt(e.verify.c1, 0, MAX_BILLS),
+      etc: clampInt(e.verify.etc, 0, MAX_ETC), at: String(e.verify.at ?? ''), note: String(e.verify.note ?? ''),
+    } : null,
+    canceled: !!e.canceled,
+    created: String(e.created ?? ''), updated: String(e.updated ?? ''),
+  }));
+  const maxNo = out.entries.reduce((m, e) => Math.max(m, e.no), 0);
+  out.seq = Math.max(clampInt(s.seq, 1, 10 ** 9), maxNo + 1);
+  if (s.closing && typeof s.closing === 'object'){
+    for (const d of DENOMS) out.closing[d.key] = clampInt(s.closing[d.key], 0, MAX_BILLS * 100);
+    out.closing.etc = clampInt(s.closing.etc, 0, MAX_ETC * 10);
+    out.closing.closedAt = s.closing.closedAt ? String(s.closing.closedAt) : null;
+  }
+  return out;
+}
+let state;
+let saveFailed = false;
+function persist(){
+  try {
+    const cur = localStorage.getItem(LS_MAIN);
+    if (cur !== null) localStorage.setItem(LS_BAK, cur);
+    localStorage.setItem(LS_MAIN, JSON.stringify(state));
+    saveFailed = false;
+    return true;
+  } catch (err) {
+    saveFailed = true;
+    showNotice('stats-notice', 'bad', '장부를 저장하지 못했습니다. 브라우저 저장 공간을 확인하고, JSON 백업을 즉시 내려받아 주세요.');
+    return false;
+  }
+}
+function loadState(){
+  let recovered = false;
+  for (const key of [LS_MAIN, LS_BAK]){
+    let raw = null;
+    try { raw = localStorage.getItem(key); } catch (err) { break; }
+    if (!raw) continue;
+    try {
+      const s = normalizeState(JSON.parse(raw));
+      if (s){
+        if (key === LS_BAK) recovered = true;
+        return { state: s, recovered };
+      }
+    } catch (err) { /* 다음 후보 시도 */ }
+    recovered = true; // 원본이 손상되어 백업을 시도하게 됨
+  }
+  return { state: freshState(), recovered: false };
+}
+
+/* ─────────────────────────── 공통 렌더 ─────────────────────────── */
+function activeEntries(){ return state.entries.filter(e => !e.canceled); }
+function ledgerTotals(){
+  const t = { c50:0, c10:0, c5:0, c1:0, etc:0, amount:0, tickets:0, gifts:0 };
+  for (const e of activeEntries()){
+    for (const d of DENOMS) t[d.key] += e[d.key];
+    t.etc += e.etc; t.tickets += e.tickets; if (e.gift) t.gifts++;
+  }
+  t.amount = t.etc + DENOMS.reduce((a, d) => a + t[d.key] * d.value, 0);
+  return t;
+}
+function statusCounts(){
+  const c = { verified:0, pending:0, mismatch:0 };
+  for (const e of activeEntries()) c[e.status]++;
+  return c;
+}
+function statusChip(e){
+  if (e.canceled) return '<span class="chip cancel">취소</span>';
+  if (e.status === 'verified') return '<span class="chip ok">검수 완료</span>';
+  if (e.status === 'mismatch') return '<span class="chip bad">불일치</span>';
+  return '<span class="chip pending">미검수</span>';
+}
+function renderHeader(){
+  $('hdr-event').textContent = state.event.name || '';
+  const t = ledgerTotals(), sc = statusCounts();
+  const closed = state.closing.closedAt;
+  $('hdr-summary').innerHTML =
+    `<span>총 봉투 <b>${activeEntries().length}</b>개</span>` +
+    `<span>총액 <b>${won(t.amount)}</b>원</span>` +
+    `<span>검수 완료 <b>${sc.verified}</b></span>` +
+    `<span>미검수 <b class="${sc.pending ? 'bad-n' : ''}">${sc.pending}</b></span>` +
+    `<span>불일치 <b class="${sc.mismatch ? 'bad-n' : ''}">${sc.mismatch}</b></span>` +
+    (closed ? `<span class="chip ok">마감 완료 · ${esc(closed)}</span>` : '');
+  const remaining = sc.pending + sc.mismatch;
+  const badge = $('verify-badge');
+  badge.hidden = remaining === 0;
+  badge.textContent = remaining;
+}
+let noticeTimers = {};
+function showNotice(id, kind, msg, sticky){
+  const el = $(id);
+  el.className = 'notice show ' + kind;
+  el.textContent = msg;
+  clearTimeout(noticeTimers[id]);
+  if (!sticky) noticeTimers[id] = setTimeout(() => { el.className = 'notice'; }, 6000);
+}
+
+/* ─────────────────────────── 권종 입력 위젯 ─────────────────────────── */
+function buildDenomTable(tableId, prefix){
+  const tb = $(tableId);
+  tb.innerHTML = DENOMS.map(d => `
+    <tr>
+      <td class="dl">${d.label}<span class="hot">${d.hot}</span></td>
+      <td>
+        <div class="denom">
+          <button type="button" data-step="-1" data-target="${prefix}-${d.key}" aria-label="${d.label} 1장 빼기">−</button>
+          <input type="number" id="${prefix}-${d.key}" min="0" max="${MAX_BILLS}" value="0" aria-label="${d.label} 장수">
+          <button type="button" data-step="1" data-target="${prefix}-${d.key}" aria-label="${d.label} 1장 더하기">＋</button>
+        </div>
+      </td>
+      <td class="dsub" id="${prefix}-${d.key}-sub">0 원</td>
+    </tr>`).join('');
+  tb.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-step]');
+    if (!btn) return;
+    const input = $(btn.dataset.target);
+    input.value = clampInt(clampInt(input.value, 0, MAX_BILLS) + Number(btn.dataset.step), 0, MAX_BILLS);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+function readCounts(prefix, etcId){
+  const c = { etc: clampInt($(etcId).value, 0, MAX_ETC) };
+  for (const d of DENOMS) c[d.key] = clampInt($(`${prefix}-${d.key}`).value, 0, MAX_BILLS);
+  return c;
+}
+function writeCounts(prefix, etcId, c){
+  for (const d of DENOMS) $(`${prefix}-${d.key}`).value = clampInt(c?.[d.key] ?? 0, 0, MAX_BILLS);
+  $(etcId).value = clampInt(c?.etc ?? 0, 0, MAX_ETC) || '';
+}
+function refreshDenomSubs(prefix, etcId, totalId){
+  const c = readCounts(prefix, etcId);
+  for (const d of DENOMS) $(`${prefix}-${d.key}-sub`).textContent = won(c[d.key] * d.value) + ' 원';
+  $(totalId).textContent = won(amountOf(c)) + ' 원';
+  return c;
+}
+function validateCountsInputs(prefix, etcId){
+  for (const d of DENOMS){
+    const el = $(`${prefix}-${d.key}`);
+    const raw = String(el.value ?? '').trim();
+    if (raw !== '' && (!/^\d+$/.test(raw) || Number(raw) > MAX_BILLS)){
+      el.focus();
+      return `지폐 장수는 0~${won(MAX_BILLS)} 사이의 숫자로 입력해 주세요.`;
+    }
+  }
+  const etcRaw = String($(etcId).value ?? '').trim().replace(/[,\s원]/g, '');
+  if (etcRaw !== '' && (!/^\d+$/.test(etcRaw) || Number(etcRaw) > MAX_ETC)){
+    $(etcId).focus();
+    return '기타 금액을 숫자로 확인해 주세요.';
+  }
+  return null;
+}
+
+/* ─────────────────────────── 1. 접수 ─────────────────────────── */
+let editingId = null;
+function entryFormCounts(){ return readCounts('en', 'in-etc'); }
+function entryFormDirty(){
+  const c = entryFormCounts();
+  return amountOf(c) > 0 || $('in-label').value || $('in-name').value || $('in-org').value ||
+    $('in-memo').value || clampInt($('in-tickets').value, 0, 999) > 0 || $('in-gift').checked;
+}
+function clearEntryForm(focus){
+  ['in-label','in-name','in-org','in-memo'].forEach(id => $(id).value = '');
+  $('in-tickets').value = 0; $('in-gift').checked = false;
+  writeCounts('en', 'in-etc', null);
+  refreshDenomSubs('en', 'in-etc', 'entry-total');
+  editingId = null;
+  $('edit-banner').className = 'edit-banner';
+  $('entry-title').textContent = '새 봉투 입력';
+  $('btn-save').textContent = '저장하고 다음 (Enter)';
+  if (focus !== false) $('in-label').focus();
+}
+function startEdit(id){
+  const e = state.entries.find(x => x.id === id);
+  if (!e) return;
+  if (entryFormDirty() && editingId !== id){
+    if (!confirm('현재 화면에 저장하지 않은 봉투 입력이 있습니다.\n이 입력을 버리고 선택한 기록을 불러올까요?')) return;
+  }
+  switchTab('entry');
+  editingId = id;
+  $('in-label').value = e.label; $('in-name').value = e.name; $('in-org').value = e.org;
+  $('in-memo').value = e.memo; $('in-tickets').value = e.tickets; $('in-gift').checked = e.gift;
+  writeCounts('en', 'in-etc', e);
+  refreshDenomSubs('en', 'in-etc', 'entry-total');
+  $('entry-title').textContent = `${e.no}번 기록 수정`;
+  $('edit-banner-text').textContent = `${e.no}번 기록 수정 중 · 저장하면 2차 검수를 다시 합니다`;
+  $('edit-banner').className = 'edit-banner show';
+  $('btn-save').textContent = '수정 저장 (Enter)';
+  $('in-label').focus();
+}
+function ensureReopenForChange(action){
+  if (!state.closing.closedAt) return true;
+  if (!confirm(`이미 마감 완료된 장부입니다.\n마감을 해제하고 ${action}할까요?`)) return false;
+  state.closing.closedAt = null;
+  return true;
+}
+function saveEntry(){
+  const err = validateCountsInputs('en', 'in-etc');
+  if (err){ showNotice('entry-notice', 'bad', err); return; }
+  const c = entryFormCounts();
+  const amount = amountOf(c);
+  const isEmpty = amount === 0;
+  if (isEmpty){
+    const who = [$('in-name').value, $('in-label').value].filter(Boolean).join(' · ') || '이름 없음';
+    if (!confirm(`센 금액이 0원입니다. (${who})\n돈이 들어있지 않은 "빈 봉투"로 기록할까요?\n\n빈 봉투도 기록해 두면 나중에 확인할 때 도움이 됩니다.`)) return;
+  }
+  if (!editingId && state.entries.length >= MAX_ENTRIES){
+    showNotice('entry-notice', 'bad', '기록 한도에 도달했습니다. 새 행사를 시작하거나 백업 후 정리해 주세요.');
+    return;
+  }
+  if (!ensureReopenForChange(editingId ? '기록을 수정' : '새 봉투를 저장')) return;
+
+  const base = {
+    label: $('in-label').value.trim(), name: $('in-name').value.trim(), org: $('in-org').value.trim(),
+    c50: c.c50, c10: c.c10, c5: c.c5, c1: c.c1, etc: c.etc,
+    tickets: clampInt($('in-tickets').value, 0, 999),
+    gift: $('in-gift').checked,
+    memo: $('in-memo').value.trim(),
+  };
+  let saved;
+  if (editingId){
+    const e = state.entries.find(x => x.id === editingId);
+    if (!e){ clearEntryForm(); return; }
+    Object.assign(e, base);
+    e.updated = nowStamp();
+    e.status = isEmpty ? 'verified' : 'pending';
+    e.verify = isEmpty ? { c50:0,c10:0,c5:0,c1:0,etc:0, at: nowStamp(), note: '빈 봉투 자동 검수' } : null;
+    saved = e;
+  } else {
+    saved = {
+      id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      no: state.seq++,
+      ...base,
+      status: isEmpty ? 'verified' : 'pending',
+      verify: isEmpty ? { c50:0,c10:0,c5:0,c1:0,etc:0, at: nowStamp(), note: '빈 봉투 자동 검수' } : null,
+      canceled: false,
+      created: nowStamp(), updated: '',
+    };
+    state.entries.push(saved);
+  }
+  if (!persist()){
+    if (!editingId) { state.entries.pop(); state.seq--; }
+    showNotice('entry-notice', 'bad', '장부를 저장하지 못했습니다. 입력은 반영되지 않았습니다.');
+    return;
+  }
+  const label = editingId ? `${saved.no}번 기록을 수정했습니다. 2차 검수를 다시 진행하세요.` :
+    `${saved.no}번 봉투 저장 완료 · ${won(amountOf(saved))}원` + (isEmpty ? ' (빈 봉투)' : '') +
+    ` — 봉투에 번호 ${saved.no}을(를) 적어 두세요.`;
+  clearEntryForm();
+  showNotice('entry-notice', 'ok', label);
+  renderAll();
+}
+function cancelEntry(id){
+  const e = state.entries.find(x => x.id === id);
+  if (!e) return;
+  if (e.canceled){
+    if (!ensureReopenForChange('기록을 복구')) return;
+    e.canceled = false;
+  } else {
+    if (!confirm(`${e.no}번 기록을 취소할까요?\n취소된 기록은 합계에서 빠지며, 목록에서 복구할 수 있습니다.`)) return;
+    if (!ensureReopenForChange('기록을 취소')) return;
+    e.canceled = true;
+    if (editingId === id) clearEntryForm();
+  }
+  e.updated = nowStamp();
+  if (!persist()) showNotice('entry-notice', 'bad', '변경을 저장하지 못했습니다.');
+  renderAll();
+}
+function entryRow(e, compact){
+  const nameOrg = [e.name || '', e.org || ''].filter(Boolean).join(' · ') || '<span style="color:var(--mute)">이름 없음</span>';
+  const act = `<button class="btn small" data-act="edit" data-id="${e.id}" type="button">수정</button>
+    <button class="btn small" data-act="cancel" data-id="${e.id}" type="button">${e.canceled ? '복구' : '취소'}</button>`;
+  if (compact){
+    return `<tr class="${e.canceled ? 'canceled' : ''}">
+      <td class="num">${e.no}</td><td>${esc(e.label)}</td><td>${e.name || e.org ? esc([e.name, e.org].filter(Boolean).join(' · ')) : nameOrg}</td>
+      <td class="num">${won(amountOf(e))} 원</td><td class="num">${e.tickets || ''}</td>
+      <td>${statusChip(e)}</td><td class="actions">${act}</td></tr>`;
+  }
+  return `<tr class="${e.canceled ? 'canceled' : ''}">
+    <td class="num">${e.no}</td><td>${esc(e.label)}</td><td>${esc(e.name)}</td><td>${esc(e.org)}</td>
+    <td class="num">${won(amountOf(e))} 원</td><td class="num">${e.tickets || ''}</td>
+    <td>${e.gift ? '지급' : ''}</td><td>${esc(e.memo)}</td>
+    <td>${statusChip(e)}</td><td class="actions">${act}</td></tr>`;
+}
+function renderRecent(){
+  const rows = [...state.entries].sort((a, b) => b.no - a.no).slice(0, 8);
+  $('recent-body').innerHTML = rows.length
+    ? rows.map(e => entryRow(e, true)).join('')
+    : '<tr><td colspan="7" style="color:var(--mute)">아직 입력된 봉투가 없습니다.</td></tr>';
+}
+
+/* ─────────────────────────── 2. 2차 검수 ─────────────────────────── */
+let verifySkips = [];   // 이번 회차에서 건너뛴 id (뒤로 밀기)
+function verifyQueue(){
+  const q = activeEntries().filter(e => e.status !== 'verified').sort((a, b) => a.no - b.no);
+  const skipped = verifySkips.filter(id => q.some(e => e.id === id));
+  verifySkips = skipped;
+  return [...q.filter(e => !skipped.includes(e.id)), ...skipped.map(id => q.find(e => e.id === id))];
+}
+function currentVerifyTarget(){ return verifyQueue()[0] || null; }
+function renderVerify(){
+  const q = verifyQueue();
+  const cur = q[0];
+  const head = $('verify-head'), box = $('vq-current');
+  if (!cur){
+    const hasAny = activeEntries().length > 0;
+    head.textContent = hasAny
+      ? '모든 봉투의 2차 확인이 끝났습니다. 마감 탭으로 이동하세요.'
+      : '먼저 1차 카운팅에서 봉투를 입력해 주세요.';
+    box.hidden = true;
+    ['btn-verify','btn-verify-reset','btn-verify-skip'].forEach(id => $(id).disabled = true);
+    return;
+  }
+  ['btn-verify','btn-verify-reset','btn-verify-skip'].forEach(id => $(id).disabled = false);
+  head.textContent = `확인 필요한 봉투 ${q.length}개 · 1차 금액은 숨겨져 있습니다`;
+  const parts = [`<b>프로그램 ${cur.no}번</b>`];
+  if (cur.label) parts.push(`봉투 표시: ${esc(cur.label)}`);
+  if (cur.name) parts.push(`이름: ${esc(cur.name)}`);
+  if (cur.org) parts.push(`소속: ${esc(cur.org)}`);
+  if (cur.status === 'mismatch') parts.push('<span class="chip bad">이전 확인이 달랐습니다 · 같은 돈을 다시 세어 주세요</span>');
+  box.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+  box.hidden = false;
+}
+function resetVerifyForm(){
+  writeCounts('vf', 'vf-etc', null);
+  refreshDenomSubs('vf', 'vf-etc', 'verify-total');
+  $('vresult').className = 'vresult';
+}
+function runVerify(){
+  const cur = currentVerifyTarget();
+  if (!cur) return;
+  const err = validateCountsInputs('vf', 'vf-etc');
+  if (err){ showNotice('entry-notice', 'bad', err); $('vresult').className = 'vresult'; return; }
+  const c = readCounts('vf', 'vf-etc');
+  if (amountOf(c) === 0){
+    const r = $('vresult');
+    r.className = 'vresult show bad';
+    r.textContent = '지금 센 금액이 0원입니다. 지폐 장수를 입력해 주세요.';
+    return;
+  }
+  const match = countsEqual(cur, c);
+  cur.verify = { ...c, at: nowStamp(), note: '' };
+  cur.status = match ? 'verified' : 'mismatch';
+  if (!persist()){
+    cur.status = 'mismatch';
+    showNotice('entry-notice', 'bad', '검수 결과를 저장하지 못했습니다.');
+  }
+  const r = $('vresult');
+  if (match){
+    r.className = 'vresult show ok';
+    r.textContent = `${cur.no}번 · 금액과 권종별 장수가 모두 일치했습니다. (${won(amountOf(c))}원) 다음 봉투로 이동합니다.`;
+    writeCounts('vf', 'vf-etc', null);
+    refreshDenomSubs('vf', 'vf-etc', 'verify-total');
+  } else {
+    r.className = 'vresult show bad';
+    r.innerHTML = `<b>${cur.no}번 · 1차와 2차가 다릅니다.</b>
+      <div class="cmp">1차: ${shortBreakdown(cur)} · 합계 ${won(amountOf(cur))}원</div>
+      <div class="cmp">2차: ${shortBreakdown(c)} · 합계 ${won(amountOf(c))}원</div>
+      <div class="cmp" style="margin-top:.3rem">돈을 다시 세어 2차 입력을 고치세요. 1차 기록이 잘못됐다면 접수 탭에서 ${cur.no}번 기록을 수정하세요.</div>`;
+  }
+  renderAll({ keepVerifyResult: true });
+}
+function skipVerify(){
+  const cur = currentVerifyTarget();
+  if (!cur) return;
+  verifySkips.push(cur.id);
+  resetVerifyForm();
+  renderAll();
+}
+
+/* ─────────────────────────── 3. 마감·정산 ─────────────────────────── */
+function closingCounts(){ return readCounts('cl', 'cl-etc'); }
+function saveClosingInputs(){
+  const c = closingCounts();
+  for (const d of DENOMS) state.closing[d.key] = c[d.key];
+  state.closing.etc = c.etc;
+  persist();
+}
+function renderClose(){
+  const t = ledgerTotals();
+  const c = state.closing;
+  const actualAmount = amountOf(c);
+  const rows = DENOMS.map(d => {
+    const diff = c[d.key] - t[d.key];
+    return `<tr><td>${d.label}</td><td>${won(t[d.key])} 장</td><td>${won(c[d.key])} 장</td>
+      <td class="${diff === 0 ? 'diff-ok' : 'diff-bad'}">${diff === 0 ? '—' : (diff > 0 ? '+' : '') + won(diff) + ' 장'}</td></tr>`;
+  }).join('');
+  const etcDiff = c.etc - t.etc;
+  const amtDiff = actualAmount - t.amount;
+  $('recon-table').innerHTML = `
+    <tr><th>권종</th><th>장부</th><th>실제</th><th>차이</th></tr>${rows}
+    <tr><td>동전·수표·기타</td><td>${won(t.etc)} 원</td><td>${won(c.etc)} 원</td>
+      <td class="${etcDiff === 0 ? 'diff-ok' : 'diff-bad'}">${etcDiff === 0 ? '—' : (etcDiff > 0 ? '+' : '') + won(etcDiff) + ' 원'}</td></tr>
+    <tr class="total"><td>총액</td><td>${won(t.amount)} 원</td><td>${won(actualAmount)} 원</td>
+      <td class="${amtDiff === 0 ? 'diff-ok' : 'diff-bad'}">${amtDiff === 0 ? '—' : (amtDiff > 0 ? '+' : '') + won(amtDiff) + ' 원'}</td></tr>`;
+  const sc = statusCounts();
+  const btn = $('btn-close');
+  if (state.closing.closedAt){
+    btn.disabled = true;
+    btn.textContent = '마감 완료 · ' + state.closing.closedAt;
+    showNotice('close-notice', 'ok', '마감 완료 상태입니다. 기록을 수정하면 마감이 해제됩니다.', true);
+    return;
+  }
+  btn.textContent = '정산 마감 확인';
+  let msg = null, kind = 'warn';
+  if (activeEntries().length === 0) msg = '아직 입력된 봉투가 없습니다.';
+  else if (sc.pending + sc.mismatch > 0) msg = `미검수 ${sc.pending}개 · 불일치 ${sc.mismatch}개 — 2차 확인 화면에서 먼저 처리해 주세요.`;
+  else if (amtDiff !== 0){ msg = '장부와 실제 현금 총액이 다릅니다. 권종별 장수를 다시 확인해 주세요.'; kind = 'bad'; }
+  else if (DENOMS.some(d => c[d.key] !== t[d.key])){ msg = '총액은 같지만 권종별 장수가 다릅니다. 실제 지폐 장수를 다시 확인해 주세요.'; kind = 'bad'; }
+  else if (etcDiff !== 0){ msg = '총액은 같지만 기타 금액 구성이 다릅니다. 동전·수표·기타 금액을 다시 확인해 주세요.'; kind = 'bad'; }
+  btn.disabled = !!msg;
+  if (msg) showNotice('close-notice', kind, msg, true);
+  else showNotice('close-notice', 'ok', '장부와 실제 현금이 정확히 일치합니다. 마감할 수 있습니다.', true);
+}
+function doClose(){
+  const t = ledgerTotals(), c = state.closing, sc = statusCounts();
+  if (activeEntries().length === 0 || sc.pending + sc.mismatch > 0 || amountOf(c) !== t.amount ||
+      DENOMS.some(d => c[d.key] !== t[d.key]) || c.etc !== t.etc){
+    renderClose();
+    return;
+  }
+  state.closing.closedAt = nowStamp();
+  if (!persist()){
+    state.closing.closedAt = null;
+    showNotice('close-notice', 'bad', '마감 상태를 저장하지 못했습니다. 디스크 공간과 권한을 확인해 주세요.', true);
+    return;
+  }
+  renderAll();
+}
+
+/* CSV */
+function csvField(v){
+  const s = String(v ?? '');
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function buildCsv(){
+  const t = ledgerTotals(), c = state.closing, sc = statusCounts();
+  const L = [];
+  L.push(['마음장부 카운터 정산표']);
+  L.push(['행사명', state.event.name || '']);
+  L.push(['내보낸 시각', nowStamp()]);
+  L.push(['마감 상태', state.closing.closedAt ? '마감 완료 · ' + state.closing.closedAt : '미마감']);
+  L.push([]);
+  L.push(['번호','봉투 표시','이름','소속','5만원권(장)','1만원권(장)','5천원권(장)','1천원권(장)','동전·수표·기타(원)','합계(원)','식권(장)','답례품','메모','검수 상태','기록 상태','입력 시각','수정 시각']);
+  const statusKo = { verified:'검수 완료', pending:'미검수', mismatch:'불일치' };
+  for (const e of [...state.entries].sort((a, b) => a.no - b.no)){
+    L.push([e.no, e.label, e.name, e.org, e.c50, e.c10, e.c5, e.c1, e.etc, amountOf(e),
+      e.tickets, e.gift ? '지급' : '', e.memo, statusKo[e.status],
+      e.canceled ? '취소' : '', e.created, e.updated]);
+  }
+  L.push([]);
+  L.push(['[정산 요약]']);
+  L.push(['장부 합계', `5만원 ${t.c50}장`, `1만원 ${t.c10}장`, `5천원 ${t.c5}장`, `1천원 ${t.c1}장`, `기타 ${t.etc}원`, `총액 ${t.amount}원`]);
+  L.push(['실제 현금', `5만원 ${c.c50}장`, `1만원 ${c.c10}장`, `5천원 ${c.c5}장`, `1천원 ${c.c1}장`, `기타 ${c.etc}원`, `총액 ${amountOf(c)}원`]);
+  L.push(['차액(실제-장부)', amountOf(c) - t.amount + '원']);
+  L.push(['봉투', `총 ${activeEntries().length}개`, `검수 완료 ${sc.verified}`, `미검수 ${sc.pending}`, `불일치 ${sc.mismatch}`, `취소 ${state.entries.filter(e => e.canceled).length}`]);
+  const tk = ticketSummary();
+  L.push(['식권', `준비 ${tk.start}장`, `지급 ${tk.given}장`, `조정 ${tk.adjust >= 0 ? '+' : ''}${tk.adjust}장`, `잔여 ${tk.remain}장`]);
+  for (const a of state.event.ticketAdjusts) L.push(['식권 조정 기록', a.desc, (a.n > 0 ? '+' : '') + a.n + '장', a.at]);
+  L.push(['답례품 지급', t.gifts + '건']);
+  return '﻿' + L.map(row => row.map(csvField).join(',')).join('\r\n') + '\r\n';
+}
+function download(filename, mime, content){
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function exportCsv(){
+  try {
+    download(`축의금_정산_${fileStamp()}.csv`, 'text/csv;charset=utf-8', buildCsv());
+    showNotice('close-notice', 'ok', 'CSV 정산표를 내려받았습니다. 엑셀에서 바로 열 수 있습니다.');
+  } catch (err) {
+    showNotice('close-notice', 'bad', 'CSV 저장 중 오류가 발생했습니다. 디스크 공간과 파일 권한을 확인해 주세요.', true);
+  }
+}
+function printSheet(){
+  const t = ledgerTotals(), c = state.closing, sc = statusCounts(), tk = ticketSummary();
+  const rows = [...state.entries].sort((a, b) => a.no - b.no).map(e => `
+    <tr><td class="num">${e.no}</td><td>${esc(e.label)}</td><td>${esc(e.name)}</td><td>${esc(e.org)}</td>
+    <td class="num">${won(amountOf(e))}</td><td class="num">${e.tickets || ''}</td>
+    <td>${esc(e.memo)}${e.canceled ? ' (취소)' : ''}</td></tr>`).join('');
+  $('print-area').innerHTML = `
+    <h1>축의금 정산표 ${state.event.name ? '— ' + esc(state.event.name) : ''}</h1>
+    <p>내보낸 시각: ${nowStamp()} · ${state.closing.closedAt ? '마감 완료 ' + esc(state.closing.closedAt) : '미마감'}</p>
+    <p>총 봉투 ${activeEntries().length}개 · 총액 ${won(t.amount)}원 · 검수 완료 ${sc.verified} · 미검수 ${sc.pending} · 불일치 ${sc.mismatch}</p>
+    <p>장부 합계: 5만원 ${t.c50}장 · 1만원 ${t.c10}장 · 5천원 ${t.c5}장 · 1천원 ${t.c1}장 · 기타 ${won(t.etc)}원</p>
+    <p>실제 현금: 5만원 ${c.c50}장 · 1만원 ${c.c10}장 · 5천원 ${c.c5}장 · 1천원 ${c.c1}장 · 기타 ${won(c.etc)}원 · 차액 ${won(amountOf(c) - t.amount)}원</p>
+    <p>식권: 준비 ${tk.start}장 · 지급 ${tk.given}장 · 조정 ${tk.adjust >= 0 ? '+' : ''}${tk.adjust}장 · 잔여 ${tk.remain}장</p>
+    <table><tr><th>번호</th><th>봉투 표시</th><th>이름</th><th>소속</th><th>금액(원)</th><th>식권</th><th>메모</th></tr>${rows}</table>`;
+  window.print();
+}
+function newEvent(){
+  if (!confirm('현재 장부를 보관하고 새 행사로 시작할까요?\n기존 장부는 JSON 백업 파일로 내려받고, 브라우저 안에도 보관본이 남습니다.')) return;
+  try {
+    download(`마음장부_보관_${fileStamp()}.json`, 'application/json', JSON.stringify(state, null, 2));
+  } catch (err) { /* 다운로드 실패해도 브라우저 내 보관은 계속 */ }
+  try {
+    localStorage.setItem(LS_ARCHIVE_PREFIX + Date.now(), JSON.stringify(state));
+    const archives = Object.keys(localStorage).filter(k => k.startsWith(LS_ARCHIVE_PREFIX)).sort();
+    while (archives.length > MAX_ARCHIVES) localStorage.removeItem(archives.shift());
+  } catch (err) {
+    if (!confirm('기존 장부를 브라우저 안에 보관하지 못했습니다.\n방금 내려받은 JSON 파일만 보관본이 됩니다. 계속 새 행사를 시작할까요?')) return;
+  }
+  const keepName = state.event.name;
+  state = freshState();
+  state.event.name = '';
+  verifySkips = [];
+  editingId = null;
+  if (!persist()){
+    showNotice('stats-notice', 'bad', '새 장부를 저장하지 못했습니다. 기존 장부를 계속 사용합니다.', true);
+    const back = loadState();
+    state = back.state;
+    renderAll();
+    return;
+  }
+  clearEntryForm(false);
+  writeCounts('cl', 'cl-etc', null);
+  $('ev-name').value = '';
+  $('tk-start').value = 0;
+  renderAll();
+  showNotice('stats-notice', 'ok', `빈 장부로 시작했습니다. 이전 장부(${keepName || '이름 없음'})는 JSON 파일과 브라우저 보관함에 남아 있습니다.`);
+}
+
+/* ─────────────────────────── 4. 기록·설정 ─────────────────────────── */
+function ticketSummary(){
+  const given = ledgerTotals().tickets;
+  const adjust = state.event.ticketAdjusts.reduce((a, x) => a + x.n, 0);
+  const start = state.event.ticketStart;
+  return { start, given, adjust, remain: start - given + adjust };
+}
+function renderStats(){
+  const t = ledgerTotals(), sc = statusCounts(), tk = ticketSummary();
+  $('stat-tiles').innerHTML = `
+    <div class="stat-tile"><div class="k">총 봉투</div><div class="v">${activeEntries().length}개</div></div>
+    <div class="stat-tile"><div class="k">총액</div><div class="v">${won(t.amount)}원</div></div>
+    <div class="stat-tile"><div class="k">검수 완료</div><div class="v">${sc.verified}개</div></div>
+    <div class="stat-tile"><div class="k">미검수·불일치</div><div class="v" style="${sc.pending + sc.mismatch ? 'color:var(--bad)' : ''}">${sc.pending + sc.mismatch}개</div></div>
+    <div class="stat-tile"><div class="k">식권 지급</div><div class="v">${t.tickets}장</div></div>
+    <div class="stat-tile"><div class="k">식권 잔여</div><div class="v" style="${tk.remain < 0 ? 'color:var(--bad)' : ''}">${tk.remain}장</div></div>`;
+  $('stat-denoms').textContent = `장부 합계 — 5만원 ${t.c50}장 · 1만원 ${t.c10}장 · 5천원 ${t.c5}장 · 1천원 ${t.c1}장 · 기타 ${won(t.etc)}원 · 답례품 ${t.gifts}건`;
+  $('tk-summary').textContent = `준비 ${tk.start}장 − 지급 ${tk.given}장 ${tk.adjust >= 0 ? '+ ' + tk.adjust : '− ' + Math.abs(tk.adjust)}장(조정) = 잔여 ${tk.remain}장` + (tk.remain < 0 ? ' — 식권이 부족합니다! 반대측에 여유분을 문의하세요.' : '');
+  $('tk-adj-list').innerHTML = state.event.ticketAdjusts.map((a, i) => `
+    <li><span class="d">${esc(a.desc) || '(내용 없음)'}</span><span class="n">${a.n > 0 ? '+' : ''}${a.n}장</span>
+    <span class="hint">${esc(a.at)}</span>
+    <button class="btn small" data-adj-del="${i}" type="button">삭제</button></li>`).join('');
+  renderAllTable();
+}
+function renderAllTable(){
+  const q = $('search').value.trim().toLowerCase();
+  let rows = [...state.entries].sort((a, b) => a.no - b.no);
+  if (q){
+    rows = rows.filter(e =>
+      String(e.no) === q ||
+      [e.label, e.name, e.org, e.memo].some(v => v && v.toLowerCase().includes(q)));
+  }
+  $('all-count').textContent = q ? `— 검색 결과 ${rows.length}건` : `— 전체 ${state.entries.length}건 (취소 포함)`;
+  $('all-body').innerHTML = rows.length
+    ? rows.map(e => entryRow(e, false)).join('')
+    : `<tr><td colspan="10" style="color:var(--mute)">${q ? '검색 결과가 없습니다.' : '아직 입력된 봉투가 없습니다.'}</td></tr>`;
+}
+function backupJson(){
+  try {
+    download(`마음장부_백업_${fileStamp()}.json`, 'application/json', JSON.stringify(state, null, 2));
+    showNotice('stats-notice', 'ok', 'JSON 백업을 내려받았습니다. USB나 메신저 "나에게 보내기"로도 사본을 남겨 두세요.');
+  } catch (err) {
+    showNotice('stats-notice', 'bad', '백업 파일을 만들지 못했습니다.', true);
+  }
+}
+function restoreJson(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    let s = null;
+    try { s = normalizeState(JSON.parse(String(reader.result))); } catch (err) { /* 아래에서 처리 */ }
+    if (!s){
+      showNotice('stats-notice', 'bad', '백업 파일을 읽지 못했습니다. 마음장부 JSON 백업 파일이 맞는지 확인해 주세요.', true);
+      return;
+    }
+    const t = s.entries.filter(e => !e.canceled);
+    if (!confirm(`백업을 불러오면 현재 장부를 대체합니다.\n\n불러올 장부: 봉투 ${t.length}개 · 행사명 "${s.event.name || '(없음)'}"\n현재 장부는 브라우저 보관함에 남겨 둡니다. 계속할까요?`)) return;
+    try { localStorage.setItem(LS_ARCHIVE_PREFIX + Date.now(), JSON.stringify(state)); } catch (err) { /* 보관 실패는 치명적이지 않음 */ }
+    state = s;
+    verifySkips = [];
+    editingId = null;
+    persist();
+    syncSettingsInputs();
+    clearEntryForm(false);
+    writeCounts('cl', 'cl-etc', state.closing);
+    renderAll();
+    showNotice('stats-notice', 'ok', '백업을 불러왔습니다.');
+  };
+  reader.readAsText(file);
+}
+function syncSettingsInputs(){
+  $('ev-name').value = state.event.name;
+  $('tk-start').value = state.event.ticketStart;
+}
+
+/* ─────────────────────────── 탭 · 렌더 총괄 ─────────────────────────── */
+let activeTab = 'entry';
+function switchTab(name){
+  activeTab = name;
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
+  if (name === 'verify') resetVerifyForm();
+  renderAll();
+}
+function renderAll(opt){
+  renderHeader();
+  renderRecent();
+  renderVerify();
+  if (!(opt && opt.keepVerifyResult) && activeTab !== 'verify') $('vresult').className = 'vresult';
+  renderClose();
+  renderStats();
+}
+
+/* ─────────────────────────── 초기화 · 이벤트 연결 ─────────────────────────── */
+function init(){
+  const loaded = loadState();
+  state = loaded.state;
+  buildDenomTable('entry-denoms', 'en');
+  buildDenomTable('verify-denoms', 'vf');
+  buildDenomTable('close-denoms', 'cl');
+  writeCounts('cl', 'cl-etc', state.closing);
+  refreshDenomSubs('cl', 'cl-etc', 'entry-total'); // 초기 서브 합계 표시(마감 탭)
+  syncSettingsInputs();
+  renderAll();
+  refreshDenomSubs('en', 'in-etc', 'entry-total');
+  refreshDenomSubs('vf', 'vf-etc', 'verify-total');
+  // 마감 탭 서브 합계 다시 정확히
+  const cl = readCounts('cl', 'cl-etc');
+  for (const d of DENOMS) $(`cl-${d.key}-sub`).textContent = won(cl[d.key] * d.value) + ' 원';
+
+  if (loaded.recovered){
+    showNotice('entry-notice', 'warn', '장부 원본을 읽지 못해 직전 백업으로 복구했습니다. 최근 입력한 봉투를 한 번 확인해 주세요.', true);
+  }
+
+  document.querySelector('nav.tabs').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-tab]');
+    if (b) switchTab(b.dataset.tab);
+  });
+
+  $('entry-denoms').addEventListener('input', () => refreshDenomSubs('en', 'in-etc', 'entry-total'));
+  $('in-etc').addEventListener('input', () => refreshDenomSubs('en', 'in-etc', 'entry-total'));
+  $('verify-denoms').addEventListener('input', () => refreshDenomSubs('vf', 'vf-etc', 'verify-total'));
+  $('vf-etc').addEventListener('input', () => refreshDenomSubs('vf', 'vf-etc', 'verify-total'));
+  const onCloseInput = () => {
+    const c = readCounts('cl', 'cl-etc');
+    for (const d of DENOMS) $(`cl-${d.key}-sub`).textContent = won(c[d.key] * d.value) + ' 원';
+    saveClosingInputs();
+    renderClose();
+    renderHeader();
+  };
+  $('close-denoms').addEventListener('input', onCloseInput);
+  $('cl-etc').addEventListener('input', onCloseInput);
+
+  $('btn-save').addEventListener('click', saveEntry);
+  $('btn-clear').addEventListener('click', () => {
+    if (entryFormDirty() && !confirm('입력을 지울까요?')) return;
+    clearEntryForm();
+  });
+  $('btn-edit-cancel').addEventListener('click', () => clearEntryForm());
+
+  const rowAction = (ev) => {
+    const b = ev.target.closest('button[data-act]');
+    if (!b) return;
+    if (b.dataset.act === 'edit') startEdit(b.dataset.id);
+    else if (b.dataset.act === 'cancel') cancelEntry(b.dataset.id);
+  };
+  $('recent-table').addEventListener('click', rowAction);
+  $('all-body').addEventListener('click', rowAction);
+
+  $('btn-verify').addEventListener('click', runVerify);
+  $('btn-verify-reset').addEventListener('click', () => { resetVerifyForm(); });
+  $('btn-verify-skip').addEventListener('click', skipVerify);
+
+  $('btn-close').addEventListener('click', doClose);
+  $('btn-csv').addEventListener('click', exportCsv);
+  $('btn-print').addEventListener('click', printSheet);
+  $('btn-new-event').addEventListener('click', newEvent);
+
+  $('ev-name').addEventListener('input', () => { state.event.name = $('ev-name').value; persist(); renderHeader(); });
+  $('tk-start').addEventListener('input', () => { state.event.ticketStart = clampInt($('tk-start').value, 0, 99999); persist(); renderStats(); });
+  $('btn-tk-adj').addEventListener('click', () => {
+    const n = clampInt($('tk-adj-n').value, -99999, 99999);
+    if (n === 0){ showNotice('stats-notice', 'warn', '조정 장수를 입력해 주세요. 빌려줌은 음수(-20), 받아옴은 양수(20)입니다.'); return; }
+    state.event.ticketAdjusts.push({ desc: $('tk-adj-desc').value.trim(), n, at: nowStamp() });
+    $('tk-adj-desc').value = ''; $('tk-adj-n').value = '';
+    persist();
+    renderStats();
+  });
+  $('tk-adj-list').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-adj-del]');
+    if (!b) return;
+    const a = state.event.ticketAdjusts[Number(b.dataset.adjDel)];
+    if (!a || !confirm(`식권 조정 기록을 삭제할까요?\n"${a.desc || '(내용 없음)'}" ${a.n > 0 ? '+' : ''}${a.n}장`)) return;
+    state.event.ticketAdjusts.splice(Number(b.dataset.adjDel), 1);
+    persist();
+    renderStats();
+  });
+  $('search').addEventListener('input', renderAllTable);
+  $('btn-backup').addEventListener('click', backupJson);
+  $('btn-restore').addEventListener('click', () => $('restore-file').click());
+  $('restore-file').addEventListener('change', (ev) => {
+    const f = ev.target.files[0];
+    ev.target.value = '';
+    if (f) restoreJson(f);
+  });
+
+  document.addEventListener('keydown', (ev) => {
+    const fnIdx = ['F1','F2','F3','F4'].indexOf(ev.key);
+    if (fnIdx >= 0 && (activeTab === 'entry' || activeTab === 'verify')){
+      ev.preventDefault();
+      const prefix = activeTab === 'entry' ? 'en' : 'vf';
+      if (activeTab === 'verify' && !currentVerifyTarget()) return;
+      const input = $(`${prefix}-${DENOMS[fnIdx].key}`);
+      input.value = clampInt(clampInt(input.value, 0, MAX_BILLS) + 1, 0, MAX_BILLS);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    const tag = (ev.target.tagName || '').toLowerCase();
+    if (ev.key === 'Enter' && tag !== 'button' && tag !== 'textarea' && !ev.isComposing){
+      if (activeTab === 'entry'){ ev.preventDefault(); saveEntry(); }
+      else if (activeTab === 'verify' && currentVerifyTarget()){ ev.preventDefault(); runVerify(); }
+    }
+    if (ev.key === 'Escape'){
+      if (activeTab === 'entry'){
+        if (entryFormDirty() && !confirm('입력을 지울까요?')) return;
+        clearEntryForm();
+      } else if (activeTab === 'verify'){
+        resetVerifyForm();
+      }
+    }
+  });
+
+  window.addEventListener('beforeunload', (ev) => {
+    if (entryFormDirty() || saveFailed){
+      ev.preventDefault();
+      ev.returnValue = '';
+    }
+  });
+  clearEntryForm(false);
+}
+init();
+</script>
+</body>
+</html>
