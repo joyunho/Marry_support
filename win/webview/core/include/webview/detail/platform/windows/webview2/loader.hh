@@ -238,7 +238,11 @@ private:
         client_dll.detach();
       }
     }
-    return ERROR_SUCCESS;
+    // [마음장부 카운터 패치] 원본은 여기서 ERROR_SUCCESS(0)를 반환해, 런타임 DLL이
+    // 없거나 심볼을 찾지 못한 경우(레지스트리만 남은 불완전 제거 등) 완료 콜백이
+    // 영원히 오지 않는 "성공"이 되어 embed()의 메시지 펌프가 무한 대기했다.
+    // 실패를 실패로 반환해야 재시도 → 포기 → 예외 → 브라우저 폴백으로 이어진다.
+    return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
   }
 
   HRESULT

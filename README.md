@@ -7,9 +7,15 @@
 
 ## 바로 다운로드해서 쓰기
 
+> **참고**: 이 저장소가 **비공개(private)** 인 동안에는 아래 curl 명령이 404 오류가 납니다.
+> 그 경우 GitHub 웹사이트에 로그인해서 받거나(파일 열고 우측 상단 다운로드 버튼),
+> 저장소를 공개(public)로 전환하면 curl 명령이 그대로 동작합니다.
+
 ### 방법 1 — Windows 실행 파일(exe)
 
-명령 프롬프트(cmd)에 아래 한 줄을 붙여넣으면 바탕화면에 내려받아집니다:
+GitHub 웹에서: **[dist 폴더](https://github.com/joyunho/Marry_support/tree/claude/improve-condolence-program-crkvnb/dist)** → `마음장부_카운터_v3.0.0.exe` 클릭 → 우측 상단 **다운로드(Download raw file)** 버튼.
+
+저장소가 공개라면 명령 프롬프트(cmd)에서 한 줄로:
 
 ```cmd
 curl -L -o "%USERPROFILE%\Desktop\마음장부_카운터.exe" https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/dist/%EB%A7%88%EC%9D%8C%EC%9E%A5%EB%B6%80_%EC%B9%B4%EC%9A%B4%ED%84%B0_v3.0.0.exe
@@ -23,7 +29,9 @@ curl -L -o "%USERPROFILE%\Desktop\마음장부_카운터.exe" https://raw.github
 
 ### 방법 2 — HTML 파일 하나로 쓰기 (설치·실행 파일 불필요)
 
-**Windows 명령 프롬프트(cmd)** — 아래 한 줄을 붙여넣으면 바탕화면에 내려받고 바로 열립니다:
+GitHub 웹에서: `index.html` 열고 우측 상단 다운로드 버튼으로 받아 더블클릭.
+
+저장소가 공개라면 **명령 프롬프트(cmd)** 에서 — 바탕화면에 내려받고 바로 열립니다:
 
 ```cmd
 curl -L -o "%USERPROFILE%\Desktop\마음장부.html" https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/index.html && start "" "%USERPROFILE%\Desktop\마음장부.html"

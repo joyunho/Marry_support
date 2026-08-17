@@ -52,7 +52,11 @@ bool writeFileAtomic(const std::wstring &path, const unsigned char *data, size_t
   BOOL ok = WriteFile(h, data, (DWORD)len, &written, nullptr);
   CloseHandle(h);
   if (!ok || written != len){ DeleteFileW(tmp.c_str()); return false; }
-  return MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING) != 0;
+  if (!MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)){
+    DeleteFileW(tmp.c_str());
+    return false;
+  }
+  return true;
 }
 
 bool fileExists(const std::wstring &path){
@@ -64,8 +68,10 @@ bool fileExists(const std::wstring &path){
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int){
   // 같은 장부를 두 창에서 열면 기록이 덮어써질 수 있어 단일 실행만 허용
-  CreateMutexW(nullptr, FALSE, L"Local\\MaeumLedgerCounter3.SingleInstance");
-  if (GetLastError() == ERROR_ALREADY_EXISTS){
+  // (핸들이 NULL이고 ACCESS_DENIED면 다른 권한의 인스턴스가 이미 실행 중인 경우)
+  HANDLE mutex = CreateMutexW(nullptr, FALSE, L"Local\\MaeumLedgerCounter3.SingleInstance");
+  DWORD mutexErr = GetLastError();
+  if ((mutex && mutexErr == ERROR_ALREADY_EXISTS) || (!mutex && mutexErr == ERROR_ACCESS_DENIED)){
     MessageBoxW(nullptr,
                 L"마음장부 카운터가 이미 실행 중입니다.",
                 kAppTitleW, MB_OK | MB_ICONINFORMATION);
@@ -104,9 +110,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int){
     w.run();
     return 0;
   } catch (...) {
-    // WebView2 런타임이 없는 PC — 기본 브라우저로 폴백 (기능 동일, 데이터는 브라우저에 저장)
+    // WebView2 런타임이 없거나 손상된 PC — 기본 브라우저로 폴백 (기능 동일, 데이터는 브라우저에 저장)
     int r = MessageBoxW(nullptr,
-        L"이 컴퓨터에 WebView2 구성 요소가 없어 프로그램 창을 열 수 없습니다.\n"
+        L"프로그램 창을 여는 데 실패했습니다.\n"
+        L"WebView2 구성 요소가 없거나 손상되었을 수 있습니다.\n\n"
         L"기본 브라우저로 대신 열까요? (기능은 동일하게 동작합니다)",
         kAppTitleW, MB_YESNO | MB_ICONQUESTION);
     if (r == IDYES){
