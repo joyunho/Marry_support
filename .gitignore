@@ -1,3 +1,9 @@
 node_modules/
 *.csv
 마음장부_*.json
+
+# Windows 빌드 중간 산출물 (build.sh가 생성/다운로드)
+win/app_html.h
+win/app.res
+win/app.ico
+win/vendor/

@@ -1,0 +1,29 @@
+#include <winver.h>
+
+1 ICON "app.ico"
+1 RT_MANIFEST "app.manifest"
+
+1 VERSIONINFO
+FILEVERSION     3,0,0,0
+PRODUCTVERSION  3,0,0,0
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "041204B0"
+    BEGIN
+      VALUE "CompanyName",      "Personal Wedding Tools"
+      VALUE "FileDescription",  "마음장부 카운터"
+      VALUE "FileVersion",      "3.0.0"
+      VALUE "InternalName",     "MaeumLedgerCounter"
+      VALUE "OriginalFilename", "마음장부_카운터_v3.0.0.exe"
+      VALUE "ProductName",      "마음장부 카운터"
+      VALUE "ProductVersion",   "3.0.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0412, 1200
+  END
+END

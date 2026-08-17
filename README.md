@@ -7,6 +7,22 @@
 
 ## 바로 다운로드해서 쓰기
 
+### 방법 1 — Windows 실행 파일(exe)
+
+명령 프롬프트(cmd)에 아래 한 줄을 붙여넣으면 바탕화면에 내려받아집니다:
+
+```cmd
+curl -L -o "%USERPROFILE%\Desktop\마음장부_카운터.exe" https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/dist/%EB%A7%88%EC%9D%8C%EC%9E%A5%EB%B6%80_%EC%B9%B4%EC%9A%B4%ED%84%B0_v3.0.0.exe
+```
+
+- 더블클릭하면 프로그램 창이 바로 열립니다. Windows 10/11이면 별도 설치가 필요 없습니다
+  (Edge에 포함된 WebView2 사용, 없는 PC에서는 기본 브라우저로 대신 열어줍니다).
+- 처음 실행할 때 Windows SmartScreen 경고("알 수 없는 게시자")가 뜨면
+  **[추가 정보] → [실행]**을 누르면 됩니다. 서명되지 않은 개인 도구라 나오는 안내입니다.
+- 장부 데이터는 `%LOCALAPPDATA%\MaeumLedgerCounter` 폴더에 저장되며, exe 파일을 옮기거나 이름을 바꿔도 유지됩니다.
+
+### 방법 2 — HTML 파일 하나로 쓰기 (설치·실행 파일 불필요)
+
 **Windows 명령 프롬프트(cmd)** — 아래 한 줄을 붙여넣으면 바탕화면에 내려받고 바로 열립니다:
 
 ```cmd
@@ -95,8 +111,13 @@ CSV 정산표, 새 행사 시작(기존 장부 보관), 저장 실패·손상 �
 
 ```
 Marry_support/
-├── index.html     # 앱 전체 (의존성 없는 단일 파일)
-├── tests/e2e.mjs  # Playwright e2e 테스트 (68개 검증)
+├── index.html       # 앱 전체 (의존성 없는 단일 파일)
+├── tests/e2e.mjs    # Playwright e2e 테스트 (68개 검증)
+├── dist/            # 빌드된 Windows exe
+├── win/             # exe 런처 소스 (WebView2 기반)
+│   ├── main.cc      #   런처 본체 — HTML 추출 후 WebView2 창 표시, 브라우저 폴백
+│   ├── build.sh     #   Linux에서 mingw-w64로 크로스 빌드
+│   └── webview/     #   벤더링된 webview 라이브러리 (프로필 고정 패치 포함)
 └── README.md
 ```
 
@@ -106,3 +127,14 @@ Marry_support/
 npm install playwright   # 크로미움 포함
 node tests/e2e.mjs
 ```
+
+exe 빌드 (Linux):
+
+```bash
+sudo apt-get install g++-mingw-w64-x86-64
+win/build.sh   # → dist/마음장부_카운터_v3.0.0.exe
+```
+
+exe는 임베드된 `index.html`을 `%LOCALAPPDATA%\MaeumLedgerCounter\app.html`로 풀어
+Windows 내장 WebView2 창에 띄우는 얇은 런처입니다. 앱 로직은 전부 `index.html`에 있으므로,
+HTML을 수정하면 `win/build.sh`만 다시 돌리면 됩니다.
