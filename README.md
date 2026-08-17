@@ -7,7 +7,13 @@
 
 ## 바로 다운로드해서 쓰기
 
-**Windows (PowerShell)** — 아래 한 줄을 붙여넣으면 내려받고 바로 열립니다:
+**Windows 명령 프롬프트(cmd)** — 아래 한 줄을 붙여넣으면 바탕화면에 내려받고 바로 열립니다:
+
+```cmd
+curl -L -o "%USERPROFILE%\Desktop\마음장부.html" https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/index.html && start "" "%USERPROFILE%\Desktop\마음장부.html"
+```
+
+**Windows PowerShell** 사용 시:
 
 ```powershell
 iwr -useb https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/index.html -OutFile $env:USERPROFILE\Desktop\마음장부.html; Start-Process $env:USERPROFILE\Desktop\마음장부.html
