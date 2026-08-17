@@ -182,6 +182,21 @@ kbd{
   border:1px solid var(--line); border-bottom-width:2px; border-radius:.3rem;
   padding:0 .35rem; font-size:.85em; background:var(--bg);
 }
+#global-error{
+  display:none; position:fixed; left:0; right:0; bottom:0; z-index:90;
+  background:var(--bad); color:#fff; font-weight:700; padding:.8rem 1.2rem; text-align:center;
+}
+#global-error.show{display:block;}
+#conflict-overlay{
+  display:none; position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.65);
+  align-items:center; justify-content:center; padding:1rem;
+}
+#conflict-overlay .box{
+  background:var(--card); color:var(--ink); border-radius:.8rem; padding:1.5rem;
+  max-width:30rem; text-align:center;
+}
+#conflict-overlay .box h2{margin-bottom:.6rem;}
+#conflict-overlay .box p{color:var(--sub); margin-bottom:1rem;}
 #print-area{display:none;}
 @media print{
   body *{visibility:hidden;}
@@ -284,6 +299,7 @@ kbd{
       <button class="btn" id="btn-verify-skip" type="button">이 봉투 건너뛰기</button>
     </div>
     <div class="vresult" id="vresult" aria-live="polite"></div>
+    <div class="notice" id="verify-notice" aria-live="polite"></div>
     <p class="kbd-help">일치: 자동으로 다음 봉투로 이동 · 불일치: 해당 봉투만 남겨 다시 확인 · 1차 기록이 잘못됐다면 접수 탭에서 해당 번호를 수정하세요.</p>
   </div>
 </section>
@@ -376,6 +392,15 @@ kbd{
 </main>
 
 <div id="print-area"></div>
+<div id="global-error" role="alert"></div>
+<div id="conflict-overlay">
+  <div class="box">
+    <h2>다른 창에서 장부가 열려 있습니다</h2>
+    <p>기록이 서로 덮어써져 유실되는 것을 막기 위해 이 창의 저장을 중단했습니다.
+    장부는 반드시 <b>한 창에서만</b> 사용하세요. 다른 창을 닫은 뒤 아래 버튼을 누르면 최신 장부를 다시 불러옵니다.</p>
+    <button class="btn primary" id="btn-conflict-reload" type="button">이 창 새로고침</button>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -391,7 +416,9 @@ const MAX_ETC   = 1000000000;     // 기타 금액 상한 10억
 const MAX_ENTRIES = 5000;         // 기록 한도
 const LS_MAIN = 'maeumLedger.v3';
 const LS_BAK  = 'maeumLedger.v3.bak';
+const LS_REV  = 'maeumLedger.v3.rev';
 const LS_ARCHIVE_PREFIX = 'maeumLedger.v3.archive.';
+const LS_CORRUPT_PREFIX = 'maeumLedger.v3.corrupt.';
 const MAX_ARCHIVES = 5;
 
 const $ = (id) => document.getElementById(id);
@@ -430,6 +457,7 @@ function esc(s){
 function freshState(){
   return {
     version: 3,
+    rev: 0,
     createdAt: nowStamp(),
     event: { name: '', ticketStart: 0, ticketAdjusts: [] }, // ticketAdjusts: {desc, n, at}
     seq: 1,
@@ -437,9 +465,15 @@ function freshState(){
     closing: { c50:0, c10:0, c5:0, c1:0, etc:0, closedAt: null },
   };
 }
-function normalizeState(s){
+function normalizeState(s, info){
   if (!s || typeof s !== 'object' || !Array.isArray(s.entries)) return null;
+  // 값이 존재하는데 숫자로 읽을 수 없으면 손상으로 집계 (0으로 대체되므로 사용자에게 알려야 함)
+  const num = (v, min, max) => {
+    if (info && v !== undefined && v !== null && v !== '' && !Number.isFinite(Number(String(v).replace(/[,\s원]/g, '')))) info.corrupt++;
+    return clampInt(v, min, max);
+  };
   const out = freshState();
+  out.rev = clampInt(s.rev, 0, Number.MAX_SAFE_INTEGER);
   out.createdAt = typeof s.createdAt === 'string' ? s.createdAt : out.createdAt;
   if (s.event && typeof s.event === 'object'){
     out.event.name = String(s.event.name ?? '');
@@ -451,13 +485,14 @@ function normalizeState(s){
     }
   }
   out.entries = s.entries.filter(e => e && typeof e === 'object').map((e, i) => ({
-    id: String(e.id ?? ('e' + i)),
+    // id는 HTML 속성에 들어가므로 안전한 문자만 허용 (악성 백업 파일 방어)
+    id: /^[A-Za-z0-9_-]{1,64}$/.test(String(e.id ?? '')) ? String(e.id) : 'e' + i + 'x' + Math.random().toString(36).slice(2, 8),
     no: clampInt(e.no, 1, 10 ** 9),
     label: String(e.label ?? ''), name: String(e.name ?? ''), org: String(e.org ?? ''),
-    c50: clampInt(e.c50, 0, MAX_BILLS), c10: clampInt(e.c10, 0, MAX_BILLS),
-    c5: clampInt(e.c5, 0, MAX_BILLS), c1: clampInt(e.c1, 0, MAX_BILLS),
-    etc: clampInt(e.etc, 0, MAX_ETC),
-    tickets: clampInt(e.tickets, 0, 999),
+    c50: num(e.c50, 0, MAX_BILLS), c10: num(e.c10, 0, MAX_BILLS),
+    c5: num(e.c5, 0, MAX_BILLS), c1: num(e.c1, 0, MAX_BILLS),
+    etc: num(e.etc, 0, MAX_ETC),
+    tickets: num(e.tickets, 0, 999),
     gift: !!e.gift,
     memo: String(e.memo ?? ''),
     status: ['pending', 'verified', 'mismatch'].includes(e.status) ? e.status : 'pending',
@@ -480,35 +515,77 @@ function normalizeState(s){
 }
 let state;
 let saveFailed = false;
+let lastGoodJson = null;   // 마지막으로 로드/저장에 성공한 직렬화본 — 백업(LS_BAK)은 항상 이것으로 유지
+let conflictLock = false;  // 다른 창이 같은 장부를 쓰고 있으면 이 창의 저장을 차단
+
+function showGlobalError(msg){
+  const el = $('global-error');
+  el.textContent = msg;
+  el.className = 'show';
+}
+function hideGlobalError(){ $('global-error').className = ''; }
+function showConflict(){
+  conflictLock = true;
+  saveFailed = true;
+  $('conflict-overlay').style.display = 'flex';
+}
+
 function persist(){
+  if (conflictLock) return false;
   try {
-    const cur = localStorage.getItem(LS_MAIN);
-    if (cur !== null) localStorage.setItem(LS_BAK, cur);
-    localStorage.setItem(LS_MAIN, JSON.stringify(state));
-    saveFailed = false;
+    // 다른 창이 먼저 저장했으면 덮어쓰지 않는다 (기록 유실 방지)
+    const storedRev = Number(localStorage.getItem(LS_REV) || 0);
+    if (storedRev > (state.rev || 0)){ showConflict(); return false; }
+    state.rev = storedRev + 1;
+    if (lastGoodJson !== null) localStorage.setItem(LS_BAK, lastGoodJson);
+    const json = JSON.stringify(state);
+    localStorage.setItem(LS_MAIN, json);
+    localStorage.setItem(LS_REV, String(state.rev));
+    lastGoodJson = json;
+    if (saveFailed){ saveFailed = false; hideGlobalError(); }
     return true;
   } catch (err) {
     saveFailed = true;
-    showNotice('stats-notice', 'bad', '장부를 저장하지 못했습니다. 브라우저 저장 공간을 확인하고, JSON 백업을 즉시 내려받아 주세요.');
+    showGlobalError('장부를 저장하지 못했습니다 — 브라우저 저장 공간을 확인하고, [4 전체 기록·설정] 탭에서 JSON 백업을 즉시 내려받아 주세요.');
     return false;
   }
 }
 function loadState(){
-  let recovered = false;
+  let sawRaw = false;
   for (const key of [LS_MAIN, LS_BAK]){
     let raw = null;
     try { raw = localStorage.getItem(key); } catch (err) { break; }
     if (!raw) continue;
+    sawRaw = true;
     try {
-      const s = normalizeState(JSON.parse(raw));
+      const info = { corrupt: 0 };
+      const s = normalizeState(JSON.parse(raw), info);
       if (s){
-        if (key === LS_BAK) recovered = true;
-        return { state: s, recovered };
+        lastGoodJson = JSON.stringify(s);
+        return { state: s, recovered: key === LS_BAK, bothCorrupt: false, corruptFields: info.corrupt };
       }
     } catch (err) { /* 다음 후보 시도 */ }
-    recovered = true; // 원본이 손상되어 백업을 시도하게 됨
   }
-  return { state: freshState(), recovered: false };
+  if (sawRaw){
+    // 원본·백업 모두 손상 — 수동 복구 가능성을 위해 손상본을 격리 보관한 뒤 빈 장부로 시작
+    try {
+      const ts = Date.now();
+      for (const key of [LS_MAIN, LS_BAK]){
+        const raw = localStorage.getItem(key);
+        if (raw) localStorage.setItem(LS_CORRUPT_PREFIX + ts + '.' + (key === LS_MAIN ? 'main' : 'bak'), raw);
+      }
+    } catch (err) { /* 격리 보관 실패 시에도 시작은 계속 */ }
+    return { state: freshState(), recovered: false, bothCorrupt: true, corruptFields: 0 };
+  }
+  return { state: freshState(), recovered: false, bothCorrupt: false, corruptFields: 0 };
+}
+function archiveCurrentState(){
+  try {
+    localStorage.setItem(LS_ARCHIVE_PREFIX + Date.now(), JSON.stringify(state));
+    const archives = Object.keys(localStorage).filter(k => k.startsWith(LS_ARCHIVE_PREFIX)).sort();
+    while (archives.length > MAX_ARCHIVES) localStorage.removeItem(archives.shift());
+    return true;
+  } catch (err) { return false; }
 }
 
 /* ─────────────────────────── 공통 렌더 ─────────────────────────── */
@@ -579,6 +656,8 @@ function buildDenomTable(tableId, prefix){
     const input = $(btn.dataset.target);
     input.value = clampInt(clampInt(input.value, 0, MAX_BILLS) + Number(btn.dataset.step), 0, MAX_BILLS);
     input.dispatchEvent(new Event('input', { bubbles: true }));
+    // 마우스 클릭이면 포커스를 빼서, 이어지는 Enter가 +1이 아니라 "저장"으로 동작하게 한다
+    if (ev.detail > 0) btn.blur();
   });
 }
 function readCounts(prefix, etcId){
@@ -599,6 +678,11 @@ function refreshDenomSubs(prefix, etcId, totalId){
 function validateCountsInputs(prefix, etcId){
   for (const d of DENOMS){
     const el = $(`${prefix}-${d.key}`);
+    // '2e' 같은 잘못된 입력은 value가 빈 문자열이 되어 조용히 0으로 계산되므로 badInput으로 잡는다
+    if (el.validity && el.validity.badInput){
+      el.focus();
+      return `${d.label} 장수를 숫자로 다시 입력해 주세요.`;
+    }
     const raw = String(el.value ?? '').trim();
     if (raw !== '' && (!/^\d+$/.test(raw) || Number(raw) > MAX_BILLS)){
       el.focus();
@@ -635,6 +719,10 @@ function clearEntryForm(focus){
 function startEdit(id){
   const e = state.entries.find(x => x.id === id);
   if (!e) return;
+  if (e.canceled){
+    alert(`${e.no}번은 취소된 기록입니다.\n장부에 되살리려면 먼저 목록에서 [복구]를 누른 뒤 수정해 주세요.`);
+    return;
+  }
   if (entryFormDirty() && editingId !== id){
     if (!confirm('현재 화면에 저장하지 않은 봉투 입력이 있습니다.\n이 입력을 버리고 선택한 기록을 불러올까요?')) return;
   }
@@ -645,10 +733,11 @@ function startEdit(id){
   writeCounts('en', 'in-etc', e);
   refreshDenomSubs('en', 'in-etc', 'entry-total');
   $('entry-title').textContent = `${e.no}번 기록 수정`;
-  $('edit-banner-text').textContent = `${e.no}번 기록 수정 중 · 저장하면 2차 검수를 다시 합니다`;
+  $('edit-banner-text').textContent = `${e.no}번 기록 수정 중 · 금액을 바꾸면 2차 검수를 다시 합니다`;
   $('edit-banner').className = 'edit-banner show';
   $('btn-save').textContent = '수정 저장 (Enter)';
   $('in-label').focus();
+  renderAll(); // 수정 중인 봉투를 검수 큐에서 즉시 제외
 }
 function ensureReopenForChange(action){
   if (!state.closing.closedAt) return true;
@@ -659,10 +748,21 @@ function ensureReopenForChange(action){
 function saveEntry(){
   const err = validateCountsInputs('en', 'in-etc');
   if (err){ showNotice('entry-notice', 'bad', err); return; }
+  const tk = $('in-tickets');
+  if (tk.validity && tk.validity.badInput){
+    tk.focus();
+    showNotice('entry-notice', 'bad', '식권 장수를 숫자로 확인해 주세요.');
+    return;
+  }
   const c = entryFormCounts();
   const amount = amountOf(c);
   const isEmpty = amount === 0;
   if (isEmpty){
+    // 완전히 빈 폼(Enter 연타 등)은 확인창 없이 안내만 — 유령 기록 방지
+    if (!entryFormDirty()){
+      showNotice('entry-notice', 'warn', '센 금액이 0원입니다. 지폐 장수를 입력해 주세요. (빈 봉투를 기록하려면 이름이나 봉투 표시를 함께 적어 주세요)');
+      return;
+    }
     const who = [$('in-name').value, $('in-label').value].filter(Boolean).join(' · ') || '이름 없음';
     if (!confirm(`센 금액이 0원입니다. (${who})\n돈이 들어있지 않은 "빈 봉투"로 기록할까요?\n\n빈 봉투도 기록해 두면 나중에 확인할 때 도움이 됩니다.`)) return;
   }
@@ -670,6 +770,7 @@ function saveEntry(){
     showNotice('entry-notice', 'bad', '기록 한도에 도달했습니다. 새 행사를 시작하거나 백업 후 정리해 주세요.');
     return;
   }
+  const prevClosedAt = state.closing.closedAt;
   if (!ensureReopenForChange(editingId ? '기록을 수정' : '새 봉투를 저장')) return;
 
   const base = {
@@ -679,14 +780,20 @@ function saveEntry(){
     gift: $('in-gift').checked,
     memo: $('in-memo').value.trim(),
   };
-  let saved;
+  let saved, prevSnapshot = null, countsChanged = true;
+  const wasEditing = editingId;
   if (editingId){
     const e = state.entries.find(x => x.id === editingId);
     if (!e){ clearEntryForm(); return; }
+    prevSnapshot = { ...e };
+    countsChanged = !countsEqual(prevSnapshot, base);
     Object.assign(e, base);
     e.updated = nowStamp();
-    e.status = isEmpty ? 'verified' : 'pending';
-    e.verify = isEmpty ? { c50:0,c10:0,c5:0,c1:0,etc:0, at: nowStamp(), note: '빈 봉투 자동 검수' } : null;
+    if (countsChanged){
+      // 금액이 바뀌었을 때만 2차 검수를 다시 요구 — 이름·메모만 고치면 검수 상태 유지
+      e.status = isEmpty ? 'verified' : 'pending';
+      e.verify = isEmpty ? { c50:0,c10:0,c5:0,c1:0,etc:0, at: nowStamp(), note: '빈 봉투 자동 검수' } : null;
+    }
     saved = e;
   } else {
     saved = {
@@ -701,13 +808,22 @@ function saveEntry(){
     state.entries.push(saved);
   }
   if (!persist()){
-    if (!editingId) { state.entries.pop(); state.seq--; }
-    showNotice('entry-notice', 'bad', '장부를 저장하지 못했습니다. 입력은 반영되지 않았습니다.');
+    // 저장 실패 시 메모리도 원상 복구 — 화면·메모리·저장소가 갈라지지 않게 한다
+    if (wasEditing && prevSnapshot){
+      const e = state.entries.find(x => x.id === wasEditing);
+      if (e) Object.assign(e, prevSnapshot);
+    } else {
+      state.entries.pop(); state.seq--;
+    }
+    state.closing.closedAt = prevClosedAt;
+    renderAll();
+    showNotice('entry-notice', 'bad', '장부를 저장하지 못했습니다. 입력은 반영되지 않았습니다.', true);
     return;
   }
-  const label = editingId ? `${saved.no}번 기록을 수정했습니다. 2차 검수를 다시 진행하세요.` :
-    `${saved.no}번 봉투 저장 완료 · ${won(amountOf(saved))}원` + (isEmpty ? ' (빈 봉투)' : '') +
-    ` — 봉투에 번호 ${saved.no}을(를) 적어 두세요.`;
+  const label = wasEditing
+    ? `${saved.no}번 기록을 수정했습니다.` + (countsChanged ? ' 2차 검수를 다시 진행하세요.' : ' (금액 변경 없음 · 검수 상태 유지)')
+    : `${saved.no}번 봉투 저장 완료 · ${won(amountOf(saved))}원` + (isEmpty ? ' (빈 봉투)' : '') +
+      ` — 봉투에 번호 ${saved.no}을(를) 적어 두세요.`;
   clearEntryForm();
   showNotice('entry-notice', 'ok', label);
   renderAll();
@@ -715,6 +831,9 @@ function saveEntry(){
 function cancelEntry(id){
   const e = state.entries.find(x => x.id === id);
   if (!e) return;
+  const prevClosedAt = state.closing.closedAt;
+  const prevCanceled = e.canceled;
+  const prevUpdated = e.updated;
   if (e.canceled){
     if (!ensureReopenForChange('기록을 복구')) return;
     e.canceled = false;
@@ -725,13 +844,18 @@ function cancelEntry(id){
     if (editingId === id) clearEntryForm();
   }
   e.updated = nowStamp();
-  if (!persist()) showNotice('entry-notice', 'bad', '변경을 저장하지 못했습니다.');
+  if (!persist()){
+    e.canceled = prevCanceled;
+    e.updated = prevUpdated;
+    state.closing.closedAt = prevClosedAt;
+    showNotice('entry-notice', 'bad', '변경을 저장하지 못했습니다.', true);
+  }
   renderAll();
 }
 function entryRow(e, compact){
   const nameOrg = [e.name || '', e.org || ''].filter(Boolean).join(' · ') || '<span style="color:var(--mute)">이름 없음</span>';
-  const act = `<button class="btn small" data-act="edit" data-id="${e.id}" type="button">수정</button>
-    <button class="btn small" data-act="cancel" data-id="${e.id}" type="button">${e.canceled ? '복구' : '취소'}</button>`;
+  const act = `<button class="btn small" data-act="edit" data-id="${esc(e.id)}" type="button">수정</button>
+    <button class="btn small" data-act="cancel" data-id="${esc(e.id)}" type="button">${e.canceled ? '복구' : '취소'}</button>`;
   if (compact){
     return `<tr class="${e.canceled ? 'canceled' : ''}">
       <td class="num">${e.no}</td><td>${esc(e.label)}</td><td>${e.name || e.org ? esc([e.name, e.org].filter(Boolean).join(' · ')) : nameOrg}</td>
@@ -753,9 +877,11 @@ function renderRecent(){
 
 /* ─────────────────────────── 2. 2차 검수 ─────────────────────────── */
 let verifySkips = [];   // 이번 회차에서 건너뛴 id (뒤로 밀기)
+let vfTargetId = null;  // 현재 검수 입력이 어느 봉투의 것인지 — 대상이 바뀔 때만 폼을 비운다
 function verifyQueue(){
-  const q = activeEntries().filter(e => e.status !== 'verified').sort((a, b) => a.no - b.no);
-  const skipped = verifySkips.filter(id => q.some(e => e.id === id));
+  // 수정 중인 봉투는 저장 전 값과 대조하게 되므로 큐에서 제외
+  const q = activeEntries().filter(e => e.status !== 'verified' && e.id !== editingId).sort((a, b) => a.no - b.no);
+  const skipped = [...new Set(verifySkips)].filter(id => q.some(e => e.id === id));
   verifySkips = skipped;
   return [...q.filter(e => !skipped.includes(e.id)), ...skipped.map(id => q.find(e => e.id === id))];
 }
@@ -771,7 +897,18 @@ function renderVerify(){
       : '먼저 1차 카운팅에서 봉투를 입력해 주세요.';
     box.hidden = true;
     ['btn-verify','btn-verify-reset','btn-verify-skip'].forEach(id => $(id).disabled = true);
+    if (vfTargetId !== null){
+      vfTargetId = null;
+      writeCounts('vf', 'vf-etc', null);
+      refreshDenomSubs('vf', 'vf-etc', 'verify-total');
+    }
     return;
+  }
+  // 검수 대상이 바뀌었을 때만 입력을 비운다 — 탭을 오가도 세던 값은 유지
+  if (cur.id !== vfTargetId){
+    vfTargetId = cur.id;
+    writeCounts('vf', 'vf-etc', null);
+    refreshDenomSubs('vf', 'vf-etc', 'verify-total');
   }
   ['btn-verify','btn-verify-reset','btn-verify-skip'].forEach(id => $(id).disabled = false);
   head.textContent = `확인 필요한 봉투 ${q.length}개 · 1차 금액은 숨겨져 있습니다`;
@@ -783,6 +920,9 @@ function renderVerify(){
   box.innerHTML = parts.join(' &nbsp;·&nbsp; ');
   box.hidden = false;
 }
+function verifyFormDirty(){
+  return amountOf(readCounts('vf', 'vf-etc')) > 0;
+}
 function resetVerifyForm(){
   writeCounts('vf', 'vf-etc', null);
   refreshDenomSubs('vf', 'vf-etc', 'verify-total');
@@ -792,27 +932,28 @@ function runVerify(){
   const cur = currentVerifyTarget();
   if (!cur) return;
   const err = validateCountsInputs('vf', 'vf-etc');
-  if (err){ showNotice('entry-notice', 'bad', err); $('vresult').className = 'vresult'; return; }
+  if (err){ showNotice('verify-notice', 'bad', err); return; }
   const c = readCounts('vf', 'vf-etc');
   if (amountOf(c) === 0){
-    const r = $('vresult');
-    r.className = 'vresult show bad';
-    r.textContent = '지금 센 금액이 0원입니다. 지폐 장수를 입력해 주세요.';
+    showNotice('verify-notice', 'bad', '지금 센 금액이 0원입니다. 지폐 장수를 입력해 주세요.');
     return;
   }
   const match = countsEqual(cur, c);
+  const prevStatus = cur.status, prevVerify = cur.verify;
   cur.verify = { ...c, at: nowStamp(), note: '' };
   cur.status = match ? 'verified' : 'mismatch';
   if (!persist()){
-    cur.status = 'mismatch';
-    showNotice('entry-notice', 'bad', '검수 결과를 저장하지 못했습니다.');
+    // 저장 실패 — 검수 결과를 되돌리고, 검수 탭 안에서 보이는 오류로 알린다
+    cur.status = prevStatus;
+    cur.verify = prevVerify;
+    showNotice('verify-notice', 'bad', '검수 결과를 저장하지 못했습니다. 같은 봉투를 다시 대조해 주세요.', true);
+    renderAll({ keepVerifyResult: true });
+    return;
   }
   const r = $('vresult');
   if (match){
     r.className = 'vresult show ok';
     r.textContent = `${cur.no}번 · 금액과 권종별 장수가 모두 일치했습니다. (${won(amountOf(c))}원) 다음 봉투로 이동합니다.`;
-    writeCounts('vf', 'vf-etc', null);
-    refreshDenomSubs('vf', 'vf-etc', 'verify-total');
   } else {
     r.className = 'vresult show bad';
     r.innerHTML = `<b>${cur.no}번 · 1차와 2차가 다릅니다.</b>
@@ -825,6 +966,7 @@ function runVerify(){
 function skipVerify(){
   const cur = currentVerifyTarget();
   if (!cur) return;
+  verifySkips = verifySkips.filter(id => id !== cur.id);
   verifySkips.push(cur.id);
   resetVerifyForm();
   renderAll();
@@ -895,20 +1037,33 @@ function csvField(v){
   const s = String(v ?? '');
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
+// 사용자가 입력한 자유 텍스트: 엑셀이 수식으로 실행하지 않도록 선행 =,+,-,@,탭을 무력화
+function csvUserText(v){
+  const s = String(v ?? '');
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
 function buildCsv(){
   const t = ledgerTotals(), c = state.closing, sc = statusCounts();
   const L = [];
   L.push(['마음장부 카운터 정산표']);
-  L.push(['행사명', state.event.name || '']);
+  L.push(['행사명', csvUserText(state.event.name || '')]);
   L.push(['내보낸 시각', nowStamp()]);
   L.push(['마감 상태', state.closing.closedAt ? '마감 완료 · ' + state.closing.closedAt : '미마감']);
   L.push([]);
-  L.push(['번호','봉투 표시','이름','소속','5만원권(장)','1만원권(장)','5천원권(장)','1천원권(장)','동전·수표·기타(원)','합계(원)','식권(장)','답례품','메모','검수 상태','기록 상태','입력 시각','수정 시각']);
+  const HEADER = ['번호','봉투 표시','이름','소속','5만원권(장)','1만원권(장)','5천원권(장)','1천원권(장)','동전·수표·기타(원)','합계(원)','식권(장)','답례품','메모','검수 상태','입력 시각','수정 시각'];
   const statusKo = { verified:'검수 완료', pending:'미검수', mismatch:'불일치' };
-  for (const e of [...state.entries].sort((a, b) => a.no - b.no)){
-    L.push([e.no, e.label, e.name, e.org, e.c50, e.c10, e.c5, e.c1, e.etc, amountOf(e),
-      e.tickets, e.gift ? '지급' : '', e.memo, statusKo[e.status],
-      e.canceled ? '취소' : '', e.created, e.updated]);
+  const entryRowCsv = (e) => [e.no, csvUserText(e.label), csvUserText(e.name), csvUserText(e.org),
+    e.c50, e.c10, e.c5, e.c1, e.etc, amountOf(e),
+    e.tickets, e.gift ? '지급' : '', csvUserText(e.memo), statusKo[e.status], e.created, e.updated];
+  L.push(HEADER);
+  for (const e of [...state.entries].filter(e => !e.canceled).sort((a, b) => a.no - b.no)) L.push(entryRowCsv(e));
+  // 취소된 기록은 합계 열 SUM이 틀어지지 않도록 별도 구역으로 분리
+  const canceled = [...state.entries].filter(e => e.canceled).sort((a, b) => a.no - b.no);
+  if (canceled.length){
+    L.push([]);
+    L.push(['[취소된 기록] — 아래 행은 장부 합계에 포함되지 않습니다']);
+    L.push(HEADER);
+    for (const e of canceled) L.push(entryRowCsv(e));
   }
   L.push([]);
   L.push(['[정산 요약]']);
@@ -918,7 +1073,7 @@ function buildCsv(){
   L.push(['봉투', `총 ${activeEntries().length}개`, `검수 완료 ${sc.verified}`, `미검수 ${sc.pending}`, `불일치 ${sc.mismatch}`, `취소 ${state.entries.filter(e => e.canceled).length}`]);
   const tk = ticketSummary();
   L.push(['식권', `준비 ${tk.start}장`, `지급 ${tk.given}장`, `조정 ${tk.adjust >= 0 ? '+' : ''}${tk.adjust}장`, `잔여 ${tk.remain}장`]);
-  for (const a of state.event.ticketAdjusts) L.push(['식권 조정 기록', a.desc, (a.n > 0 ? '+' : '') + a.n + '장', a.at]);
+  for (const a of state.event.ticketAdjusts) L.push(['식권 조정 기록', csvUserText(a.desc), (a.n > 0 ? '+' : '') + a.n + '장', a.at]);
   L.push(['답례품 지급', t.gifts + '건']);
   return '﻿' + L.map(row => row.map(csvField).join(',')).join('\r\n') + '\r\n';
 }
@@ -961,22 +1116,22 @@ function newEvent(){
   try {
     download(`마음장부_보관_${fileStamp()}.json`, 'application/json', JSON.stringify(state, null, 2));
   } catch (err) { /* 다운로드 실패해도 브라우저 내 보관은 계속 */ }
-  try {
-    localStorage.setItem(LS_ARCHIVE_PREFIX + Date.now(), JSON.stringify(state));
-    const archives = Object.keys(localStorage).filter(k => k.startsWith(LS_ARCHIVE_PREFIX)).sort();
-    while (archives.length > MAX_ARCHIVES) localStorage.removeItem(archives.shift());
-  } catch (err) {
+  if (!archiveCurrentState()){
     if (!confirm('기존 장부를 브라우저 안에 보관하지 못했습니다.\n방금 내려받은 JSON 파일만 보관본이 됩니다. 계속 새 행사를 시작할까요?')) return;
   }
   const keepName = state.event.name;
+  const prevState = state;
+  const prevEditing = editingId;
   state = freshState();
-  state.event.name = '';
+  state.rev = Number(localStorage.getItem(LS_REV) || 0); // 새 장부가 이 창의 최신 저장본을 잇도록
   verifySkips = [];
+  vfTargetId = null;
   editingId = null;
   if (!persist()){
+    // 실패 시 원래 장부와 편집 상태를 그대로 복원 — 화면과 동작이 어긋나지 않게
+    state = prevState;
+    editingId = prevEditing;
     showNotice('stats-notice', 'bad', '새 장부를 저장하지 못했습니다. 기존 장부를 계속 사용합니다.', true);
-    const back = loadState();
-    state = back.state;
     renderAll();
     return;
   }
@@ -1044,16 +1199,21 @@ function restoreJson(file){
     }
     const t = s.entries.filter(e => !e.canceled);
     if (!confirm(`백업을 불러오면 현재 장부를 대체합니다.\n\n불러올 장부: 봉투 ${t.length}개 · 행사명 "${s.event.name || '(없음)'}"\n현재 장부는 브라우저 보관함에 남겨 둡니다. 계속할까요?`)) return;
-    try { localStorage.setItem(LS_ARCHIVE_PREFIX + Date.now(), JSON.stringify(state)); } catch (err) { /* 보관 실패는 치명적이지 않음 */ }
+    if (!archiveCurrentState()){
+      if (!confirm('현재 장부를 브라우저 보관함에 남기지 못했습니다.\n그래도 백업을 불러와 현재 장부를 대체할까요?')) return;
+    }
+    s.rev = Number(localStorage.getItem(LS_REV) || 0); // 복원본이 이 창의 최신 저장본을 잇도록
     state = s;
     verifySkips = [];
+    vfTargetId = null;
     editingId = null;
-    persist();
+    const ok = persist();
     syncSettingsInputs();
     clearEntryForm(false);
     writeCounts('cl', 'cl-etc', state.closing);
     renderAll();
-    showNotice('stats-notice', 'ok', '백업을 불러왔습니다.');
+    if (ok) showNotice('stats-notice', 'ok', '백업을 불러왔습니다.');
+    else showNotice('stats-notice', 'bad', '백업을 화면에 불러왔지만 저장하지 못했습니다. 저장 공간을 확인한 뒤 아무 항목이나 수정해 다시 저장을 시도해 주세요.', true);
   };
   reader.readAsText(file);
 }
@@ -1065,10 +1225,10 @@ function syncSettingsInputs(){
 /* ─────────────────────────── 탭 · 렌더 총괄 ─────────────────────────── */
 let activeTab = 'entry';
 function switchTab(name){
+  if (activeTab === name) return; // 활성 탭 재클릭으로 검수 입력이 날아가지 않게
   activeTab = name;
   document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
   document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
-  if (name === 'verify') resetVerifyForm();
   renderAll();
 }
 function renderAll(opt){
@@ -1084,6 +1244,8 @@ function renderAll(opt){
 function init(){
   const loaded = loadState();
   state = loaded.state;
+  // 백업본 복구·빈 장부 시작 시 rev가 저장소보다 뒤처져 자기 자신을 다른 창으로 오인하지 않게 정렬
+  try { state.rev = Math.max(state.rev || 0, Number(localStorage.getItem(LS_REV) || 0)); } catch (err) { /* 무시 */ }
   buildDenomTable('entry-denoms', 'en');
   buildDenomTable('verify-denoms', 'vf');
   buildDenomTable('close-denoms', 'cl');
@@ -1100,6 +1262,19 @@ function init(){
   if (loaded.recovered){
     showNotice('entry-notice', 'warn', '장부 원본을 읽지 못해 직전 백업으로 복구했습니다. 최근 입력한 봉투를 한 번 확인해 주세요.', true);
   }
+  if (loaded.bothCorrupt){
+    showNotice('entry-notice', 'bad', '장부 원본과 백업을 모두 읽지 못했습니다. 손상된 데이터는 브라우저 보관함에 그대로 남겨 두었고, 빈 장부로 시작합니다. 이전에 내려받은 JSON 백업이 있다면 [4 전체 기록·설정] 탭에서 불러올 수 있습니다.', true);
+  }
+  if (loaded.corruptFields > 0){
+    showNotice('entry-notice', 'warn', `기록 중 숫자로 읽을 수 없는 값 ${loaded.corruptFields}개를 0으로 대체해 불러왔습니다. 금액과 장수를 한 번 확인해 주세요.`, true);
+  }
+  if (location.protocol === 'file:'){
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.style.marginTop = '.4rem';
+    hint.textContent = '이 파일을 다른 폴더로 옮기거나 이름을 바꾸면 브라우저에 따라 저장된 기록이 보이지 않을 수 있습니다. 행사 중에는 파일을 옮기지 말고, 끝나면 JSON 백업을 꼭 내려받으세요.';
+    $('btn-backup').closest('.card').insertBefore(hint, $('btn-backup').parentElement);
+  }
 
   document.querySelector('nav.tabs').addEventListener('click', (ev) => {
     const b = ev.target.closest('button[data-tab]');
@@ -1111,6 +1286,16 @@ function init(){
   $('verify-denoms').addEventListener('input', () => refreshDenomSubs('vf', 'vf-etc', 'verify-total'));
   $('vf-etc').addEventListener('input', () => refreshDenomSubs('vf', 'vf-etc', 'verify-total'));
   const onCloseInput = () => {
+    if (state.closing.closedAt){
+      // 마감 도장이 찍힌 뒤에는 확인 없이 정산 기록을 고칠 수 없다
+      if (!confirm('이미 마감 완료된 장부입니다.\n마감을 해제하고 실제 현금 입력을 수정할까요?')){
+        writeCounts('cl', 'cl-etc', state.closing);
+        const prev = readCounts('cl', 'cl-etc');
+        for (const d of DENOMS) $(`cl-${d.key}-sub`).textContent = won(prev[d.key] * d.value) + ' 원';
+        return;
+      }
+      state.closing.closedAt = null;
+    }
     const c = readCounts('cl', 'cl-etc');
     for (const d of DENOMS) $(`cl-${d.key}-sub`).textContent = won(c[d.key] * d.value) + ' 원';
     saveClosingInputs();
@@ -1125,7 +1310,7 @@ function init(){
     if (entryFormDirty() && !confirm('입력을 지울까요?')) return;
     clearEntryForm();
   });
-  $('btn-edit-cancel').addEventListener('click', () => clearEntryForm());
+  $('btn-edit-cancel').addEventListener('click', () => { clearEntryForm(); renderAll(); });
 
   const rowAction = (ev) => {
     const b = ev.target.closest('button[data-act]');
@@ -1137,7 +1322,10 @@ function init(){
   $('all-body').addEventListener('click', rowAction);
 
   $('btn-verify').addEventListener('click', runVerify);
-  $('btn-verify-reset').addEventListener('click', () => { resetVerifyForm(); });
+  $('btn-verify-reset').addEventListener('click', () => {
+    if (verifyFormDirty() && !confirm('지금 센 입력을 지울까요?')) return;
+    resetVerifyForm();
+  });
   $('btn-verify-skip').addEventListener('click', skipVerify);
 
   $('btn-close').addEventListener('click', doClose);
@@ -1174,6 +1362,9 @@ function init(){
   });
 
   document.addEventListener('keydown', (ev) => {
+    // 한글 IME 조합 중(또는 조합 확정 키)에는 어떤 단축키도 실행하지 않는다
+    // (keyCode 229는 Safari 등에서 isComposing이 false로 남는 조합 키 입력을 잡는다)
+    if (ev.isComposing || ev.keyCode === 229) return;
     const fnIdx = ['F1','F2','F3','F4'].indexOf(ev.key);
     if (fnIdx >= 0 && (activeTab === 'entry' || activeTab === 'verify')){
       ev.preventDefault();
@@ -1185,7 +1376,7 @@ function init(){
       return;
     }
     const tag = (ev.target.tagName || '').toLowerCase();
-    if (ev.key === 'Enter' && tag !== 'button' && tag !== 'textarea' && !ev.isComposing){
+    if (ev.key === 'Enter' && tag !== 'button' && tag !== 'textarea' && !ev.repeat){
       if (activeTab === 'entry'){ ev.preventDefault(); saveEntry(); }
       else if (activeTab === 'verify' && currentVerifyTarget()){ ev.preventDefault(); runVerify(); }
     }
@@ -1193,18 +1384,25 @@ function init(){
       if (activeTab === 'entry'){
         if (entryFormDirty() && !confirm('입력을 지울까요?')) return;
         clearEntryForm();
+        renderAll();
       } else if (activeTab === 'verify'){
+        if (verifyFormDirty() && !confirm('지금 센 입력을 지울까요?')) return;
         resetVerifyForm();
       }
     }
   });
 
   window.addEventListener('beforeunload', (ev) => {
-    if (entryFormDirty() || saveFailed){
+    if (entryFormDirty() || verifyFormDirty() || saveFailed){
       ev.preventDefault();
       ev.returnValue = '';
     }
   });
+  // 다른 창(탭)이 같은 장부에 저장하면 이 창을 잠근다 — 두 창이 서로 덮어쓰는 사고 방지
+  window.addEventListener('storage', (ev) => {
+    if (ev.key === LS_MAIN || ev.key === LS_REV) showConflict();
+  });
+  $('btn-conflict-reload').addEventListener('click', () => location.reload());
   clearEntryForm(false);
 }
 init();

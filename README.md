@@ -5,6 +5,30 @@
 기존 v2.0.0은 Windows 전용 exe였지만, 3.0은 **`index.html` 파일 하나**로 동작하는 오프라인 웹앱입니다.
 설치가 필요 없고, 접수대의 노트북·태블릿 어디서든 브라우저로 열면 바로 쓸 수 있습니다. 인터넷 연결도 필요 없습니다.
 
+## 바로 다운로드해서 쓰기
+
+**Windows (PowerShell)** — 아래 한 줄을 붙여넣으면 내려받고 바로 열립니다:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/index.html -OutFile $env:USERPROFILE\Desktop\마음장부.html; Start-Process $env:USERPROFILE\Desktop\마음장부.html
+```
+
+**macOS / Linux**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/joyunho/Marry_support/claude/improve-condolence-program-crkvnb/index.html -o ~/Desktop/마음장부.html
+open ~/Desktop/마음장부.html   # Linux는 xdg-open
+```
+
+**git으로 전체 받기**:
+
+```bash
+git clone https://github.com/joyunho/Marry_support.git
+```
+
+내려받은 `마음장부.html`(= `index.html`) 파일 하나만 있으면 됩니다. USB에 담아 행사장 컴퓨터로 옮겨도 그대로 동작합니다.
+단, 기록은 **연 브라우저·컴퓨터에 저장**되므로 행사 당일 쓸 컴퓨터에서 미리 한 번 열어보는 것을 권장합니다.
+
 ## 사용 방법
 
 `index.html`을 더블클릭해 브라우저(크롬·엣지 권장)로 열면 끝입니다.
@@ -45,19 +69,28 @@ CSV 정산표, 새 행사 시작(기존 장부 보관), 저장 실패·손상 �
 
 ## 데이터 저장과 백업
 
-- 입력 즉시 브라우저 저장소(localStorage)에 자동 저장되며, 직전 상태의 백업본을 함께 유지합니다.
-  원본이 손상되면 자동으로 백업본으로 복구합니다.
+- 입력 즉시 브라우저 저장소(localStorage)에 자동 저장되며, **마지막으로 정상 저장된 상태**를 백업본으로 함께 유지합니다.
+  원본이 손상되면 자동으로 백업본으로 복구하고, 백업까지 손상된 경우에도 손상본을 격리 보관한 뒤 알려줍니다.
 - **같은 브라우저·같은 컴퓨터**에 저장됩니다. 행사가 끝나면 반드시
   **[CSV 정산표 저장]**과 **[JSON 백업 내려받기]**로 파일 사본을 남겨 두세요.
 - [새 행사 시작]을 누르면 기존 장부가 JSON 파일로 내려받아지고, 브라우저 안 보관함에도 남습니다(최근 5개).
 - JSON 백업은 [JSON 백업 불러오기]로 언제든 복원할 수 있습니다.
+
+### 큰돈을 다루는 만큼 들어간 안전장치
+
+- **두 창 동시 사용 감지** — 같은 장부를 두 창에서 열고 저장하면 서로 덮어써 기록이 사라질 수 있어, 이를 감지해 한쪽 창을 잠급니다.
+- **저장 실패 시 완전 롤백** — 저장 공간 부족 등으로 저장에 실패하면 화면·메모리·저장소가 어긋나지 않도록 입력 전 상태로 되돌리고, 어느 탭에서든 보이는 경고 띠로 알립니다.
+- **마감 잠금** — 마감 완료 후에는 확인 없이 정산 숫자를 고칠 수 없습니다.
+- **한글 입력 안전** — 이름을 입력하다 한글 조합 중 Enter/Esc를 눌러도 저장·초기화가 오동작하지 않습니다(Safari·iPad 포함).
+- **실수 방지** — +/− 버튼을 누른 직후의 Enter는 장수 추가가 아니라 저장으로 동작하고, 빈 화면에서 Enter를 연타해도 유령 기록이 생기지 않으며, `2e` 같은 잘못된 숫자는 0으로 조용히 저장되지 않고 걸러냅니다.
+- **엑셀 안전** — CSV에서 취소된 봉투는 합계가 어긋나지 않게 별도 구역으로 분리되고, 이름에 수식 문자가 있어도 엑셀에서 실행되지 않습니다.
 
 ## 개발
 
 ```
 Marry_support/
 ├── index.html     # 앱 전체 (의존성 없는 단일 파일)
-├── tests/e2e.mjs  # Playwright 스모크 테스트 (47개 검증)
+├── tests/e2e.mjs  # Playwright e2e 테스트 (68개 검증)
 └── README.md
 ```
 

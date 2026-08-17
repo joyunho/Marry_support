@@ -92,23 +92,28 @@ await page.click('#btn-verify');
 check('재검수 후 일치', (await page.textContent('#vresult')).includes('모두 일치'));
 check('검수 잔여 없음', (await page.textContent('#verify-head')).includes('끝났습니다'));
 
-console.log('5) 수정하면 검수 초기화');
+console.log('5) 수정 — 금액이 바뀔 때만 검수 초기화');
 await page.click('nav.tabs button[data-tab="entry"]');
 await page.click('#recent-body button[data-act="edit"]');       // 최신(3번 빈 봉투) 수정
 check('수정 배너 표시', await page.isVisible('#edit-banner.show'));
 await page.click('#btn-edit-cancel');
-// 2번 기록 수정: 이름만 바꿔 저장 → 미검수로 복귀
+// 2번 기록: 이름만 수정 → 검수 상태 유지 (재검수 불필요)
 const editBtns = page.locator('#recent-body button[data-act="edit"]');
 await editBtns.nth(1).click();
 check('2번 수정 배너', (await page.textContent('#edit-banner-text')).includes('2번'));
 await page.fill('#in-name', '이영희(성함 확인)');
 await page.click('#btn-save');
-check('수정 후 미검수 1', (await page.textContent('#hdr-summary')).match(/미검수 <b[^>]*>1/) !== null
-  || (await page.textContent('#hdr-summary')).includes('미검수 1'));
+check('이름만 수정 → 검수 상태 유지', (await page.textContent('#entry-notice')).includes('검수 상태 유지'));
+// 2번 기록: 금액 수정 → 미검수로 복귀
+await editBtns.nth(1).click();
+await page.fill('#in-etc', '6000');
+await page.dispatchEvent('#in-etc', 'input');
+await page.click('#btn-save');
+check('금액 수정 → 재검수 요구', (await page.textContent('#entry-notice')).includes('2차 검수'));
 // 재검수로 되돌림
 await page.click('nav.tabs button[data-tab="verify"]');
 await setCount('vf', 'c10', 10);
-await page.fill('#vf-etc', '5000');
+await page.fill('#vf-etc', '6000');
 await page.dispatchEvent('#vf-etc', 'input');
 await page.click('#btn-verify');
 check('재검수 완료', (await page.textContent('#verify-head')).includes('끝났습니다'));
@@ -134,7 +139,7 @@ await page.click('nav.tabs button[data-tab="close"]');
 check('마감 버튼 비활성(현금 미입력)', await page.isDisabled('#btn-close'));
 await setCount('cl', 'c50', 3);
 await setCount('cl', 'c10', 10);
-await page.fill('#cl-etc', '5000');
+await page.fill('#cl-etc', '6000');
 await page.dispatchEvent('#cl-etc', 'input');
 check('차액 0 → 마감 가능', !(await page.isDisabled('#btn-close')));
 check('일치 안내', (await page.textContent('#close-notice')).includes('정확히 일치'));
@@ -149,7 +154,7 @@ const { readFileSync } = await import('node:fs');
 const csv = readFileSync(csvPath, 'utf8');
 check('CSV BOM 포함', csv.charCodeAt(0) === 0xFEFF);
 check('CSV에 김철수 행', csv.includes('김철수'));
-check('CSV 총액', csv.includes('총액 255000원'));
+check('CSV 총액', csv.includes('총액 256000원'));
 check('CSV 식권 요약', csv.includes('잔여 78장'));
 check('CSV 식권 조정 기록', csv.includes('신랑측에 빌려줌'));
 
@@ -187,6 +192,87 @@ await page.fill('#en-c50', '99999'); // 상한 초과
 await page.dispatchEvent('#en-c50', 'input');
 await page.click('#btn-save');
 check('장수 상한 검증 메시지', (await page.textContent('#entry-notice')).includes('0~20,000'));
+await page.fill('#en-c50', '0');
+await page.dispatchEvent('#en-c50', 'input');
+
+console.log('13) 검수 입력 유지 · 건너뛰기 중복 방지');
+// 현재: 4번(박추가, 1천원 5장)만 미검수. 5번 봉투 추가
+await page.fill('#in-name', '최유지');
+await setCount('en', 'c50', 2);
+await page.click('#btn-save');
+check('5번 저장', (await page.textContent('#entry-notice')).includes('5번 봉투 저장'));
+await page.click('nav.tabs button[data-tab="verify"]');
+check('검수 대상 2개(4번·5번)', (await page.textContent('#verify-head')).includes('봉투 2개'));
+check('현재 대상 4번', (await page.textContent('#vq-current')).includes('4번'));
+await setCount('vf', 'c1', 5);
+await page.click('#btn-verify');
+check('4번 일치', (await page.textContent('#vresult')).includes('모두 일치'));
+check('다음 대상 5번', (await page.textContent('#vq-current')).includes('5번'));
+// 세다 말고 탭을 이동했다 돌아와도 입력 유지
+await setCount('vf', 'c50', 1);
+await page.click('nav.tabs button[data-tab="entry"]');
+await page.click('nav.tabs button[data-tab="verify"]');
+check('탭 이동 후 검수 입력 유지', (await page.inputValue('#vf-c50')) === '1');
+await page.click('nav.tabs button[data-tab="verify"]'); // 활성 탭 재클릭
+check('활성 탭 재클릭 후에도 유지', (await page.inputValue('#vf-c50')) === '1');
+// 건너뛰기를 반복해도 남은 개수가 부풀지 않음
+dialogs.length = 0;
+await page.click('#btn-verify-skip'); // dirty 입력은 skip 시 초기화됨(의도)
+await page.click('#btn-verify-skip');
+check('건너뛰기 2회에도 봉투 1개', (await page.textContent('#verify-head')).includes('봉투 1개'));
+await setCount('vf', 'c50', 2);
+await page.click('#btn-verify');
+check('5번 검수 완료', (await page.textContent('#verify-head')).includes('끝났습니다'));
+
+console.log('14) +/− 버튼 포커스 상태에서 Enter는 저장으로 동작');
+await page.click('nav.tabs button[data-tab="entry"]');
+await page.click('#entry-denoms button[data-step="1"][data-target="en-c50"]'); // 마우스 클릭 → blur됨
+check('클릭으로 5만원 1장', (await page.inputValue('#en-c50')) === '1');
+await page.keyboard.press('Enter');
+check('Enter가 +1이 아니라 저장 실행', (await page.textContent('#entry-notice')).includes('6번 봉투 저장'));
+
+console.log('15) 빈 폼 Enter 연타 시 유령 기록 없음');
+dialogs.length = 0;
+await page.keyboard.press('Enter');
+check('빈 폼 Enter → 안내만, confirm 없음', dialogs.length === 0
+  && (await page.textContent('#entry-notice')).includes('지폐 장수를 입력'));
+check('총 봉투 6개 유지', (await page.textContent('#hdr-summary')).includes('총 봉투 6개'));
+
+console.log('16) CSV 수식 주입 방어 · 취소 기록 분리');
+await page.fill('#in-name', '=1+2');
+await setCount('en', 'c1', 1);
+await page.click('#btn-save');
+dialogs.length = 0;
+await page.click('#recent-body button[data-act="cancel"]'); // 최신 7번 취소
+check('취소 confirm', dialogs.some(m => m.includes('취소할까요')));
+await page.click('nav.tabs button[data-tab="close"]');
+const [ csvDl2 ] = await Promise.all([ page.waitForEvent('download'), page.click('#btn-csv') ]);
+const csv2 = readFileSync(await csvDl2.path(), 'utf8');
+check('취소 기록 별도 구역', csv2.includes('[취소된 기록]'));
+check('수식 주입 무력화(선행 따옴표)', csv2.includes("'=1+2"));
+check('취소 행은 본표 아래 구역에만', csv2.indexOf("'=1+2") > csv2.indexOf('[취소된 기록]'));
+
+console.log('17) 취소된 기록은 수정 차단');
+await page.click('nav.tabs button[data-tab="entry"]');
+dialogs.length = 0;
+await page.click('#recent-body button[data-act="edit"]'); // 최신 7번(취소됨)
+check('취소 기록 수정 차단 안내', dialogs.some(m => m.includes('취소된 기록')));
+check('수정 배너 없음', !(await page.isVisible('#edit-banner.show')));
+
+console.log('18) 두 창 동시 사용 감지');
+const page2 = await ctx.newPage();
+page2.on('dialog', async (d) => { await d.accept(); });
+await page2.goto(APP);
+await page2.fill('#in-name', '충돌테스트');
+await page2.fill('#en-c1', '1');
+await page2.dispatchEvent('#en-c1', 'input');
+await page2.click('#btn-save');
+let conflictShown = false;
+try {
+  await page.waitForSelector('#conflict-overlay', { state: 'visible', timeout: 5000 });
+  conflictShown = true;
+} catch (e) { /* 미표시 */ }
+check('기존 창에 충돌 경고 오버레이 표시', conflictShown);
 
 await browser.close();
 console.log(`\n결과: ${passed} 통과 · ${failed} 실패`);
